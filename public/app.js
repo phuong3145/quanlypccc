@@ -63,7 +63,7 @@ function renderLvBadge(lv) {
   const pid = parentLvId(lv);
   if (!pid) return '<span class="tag">—</span>';
   const name = LINH_VUC_MAP[pid] || '';
-  return `<span class="lv-badge" title="${esc(name)}"><b>ID: ${esc(pid)}</b> Lĩnh vực ${esc(pid)}</span>${name ? `<span class="lv-sub">${esc(name)}</span>` : ''}`;
+  return `<span class="lv-badge" title="${esc(name)}">Lĩnh vực ${esc(pid)}</span>${name ? `<span class="lv-sub">${esc(name)}</span>` : ''}`;
 }
 
 function facilityForm(f = {}, prefix = 'f') {
@@ -72,7 +72,7 @@ function facilityForm(f = {}, prefix = 'f') {
     const items = TYPES.filter((t) => parentLvId(t.linhVuc) === id);
     if (!items.length) return '';
     return `<optgroup label="Lĩnh vực ${id}: ${esc(LINH_VUC_MAP[id])}">${items
-      .map((t) => `<option value="${esc(t.ten)}" data-lv="${id}" data-ma="${esc(t.maLoaiHinh || '')}" ${t.ten === f.loaiHinh ? 'selected' : ''}>[${esc(t.maLoaiHinh || id)}] ${esc(t.ten)}</option>`)
+      .map((t) => `<option value="${esc(t.ten)}" data-lv="${id}" ${t.ten === f.loaiHinh ? 'selected' : ''}>${esc(t.ten)}</option>`)
       .join('')}</optgroup>`;
   }).join('');
   const extraOpt = f.loaiHinh && !TYPES.some((t) => t.ten === f.loaiHinh)
@@ -85,7 +85,7 @@ function facilityForm(f = {}, prefix = 'f') {
       if (kind === 'type') {
         input = `<select id="${id}"><option value="">-- Chọn loại hình cơ sở --</option>${extraOpt}${groupedOptions}</select>`;
       } else if (kind === 'linhvuc') {
-        input = `<select id="${id}">${LV_IDS.map((lid) => `<option value="${lid}" ${lid === curLv ? 'selected' : ''}>ID: ${lid} — ${esc(LINH_VUC_MAP[lid])}</option>`).join('')}</select>`;
+        input = `<select id="${id}">${LV_IDS.map((lid) => `<option value="${lid}" ${lid === curLv ? 'selected' : ''}>Lĩnh vực ${lid} — ${esc(LINH_VUC_MAP[lid])}</option>`).join('')}</select>`;
       } else if (kind === 'select') {
         const list = f[k] && !opts.includes(f[k]) ? [...opts, f[k]] : opts;
         input = `<select id="${id}">${list.map((o) => `<option ${o === f[k] ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
@@ -110,7 +110,6 @@ function bindFacilityFormEvents(prefix = 'f') {
 const readForm = (prefix = 'f') => {
   const obj = Object.fromEntries(FIELDS.map(([k]) => [k, $(`#${prefix}_${k}`).value.trim()]));
   const opt = $(`#${prefix}_loaiHinh`)?.selectedOptions?.[0];
-  if (opt?.dataset?.ma) obj.maLoaiHinh = opt.dataset.ma;
   if (opt?.dataset?.lv) obj.linhVuc = opt.dataset.lv; // Đảm bảo luôn lưu ID của phần cha (1..10)
   return obj;
 };
@@ -137,6 +136,9 @@ new MutationObserver(() => {
   app.querySelectorAll('#add,#tang,#giam,[data-edit],[data-del],[data-d],[data-e],a[href^="#/new-inspection"]').forEach((e) => e.remove());
 }).observe(app, { childList: true, subtree: true });
 
+const EYE_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const EYE_OFF_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+
 function authScreen(setup) {
   $('#shell').classList.add('hidden');
   const v = $('#authView');
@@ -161,7 +163,7 @@ function authScreen(setup) {
         <label for="a_pw">Mật khẩu * (tối thiểu 6 ký tự)</label>
         <div class="pw-wrap">
           <input id="a_pw" name="password" type="password" placeholder="Nhập mật khẩu..." required minlength="6" autocomplete="off">
-          <button type="button" class="pw-toggle" id="a_toggle" tabindex="-1">Hiện</button>
+          <button type="button" class="pw-toggle" id="a_toggle" title="Hiện / ẩn mật khẩu" aria-label="Hiện / ẩn mật khẩu" tabindex="-1">${EYE_ICON}</button>
         </div>
       </div>
       <div class="err" id="a_err"></div>
@@ -174,7 +176,7 @@ function authScreen(setup) {
   toggleBtn.onclick = () => {
     const isPw = pwInput.type === 'password';
     pwInput.type = isPw ? 'text' : 'password';
-    toggleBtn.textContent = isPw ? 'Ẩn' : 'Hiện';
+    toggleBtn.innerHTML = isPw ? EYE_OFF_ICON : EYE_ICON;
     pwInput.focus();
   };
   $('#authForm').onsubmit = async (e) => {
@@ -275,7 +277,7 @@ async function dashboard() {
     <div class="card slate"><b>${s.inspections}</b>Biên bản kiểm tra đã lập</div>
   </div>
   <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr))">
-    <div class="card"><h4>Phân bố theo 10 Lĩnh vực PCCC (ID cha)</h4>${bars(fieldItems, (x) => `ID ${x._id}: ${LINH_VUC_MAP[x._id] || 'Khác'}`)}</div>
+    <div class="card"><h4>Phân bố theo 10 Lĩnh vực PCCC</h4>${bars(fieldItems, (x) => `Lĩnh vực ${x._id}: ${LINH_VUC_MAP[x._id] || 'Khác'}`)}</div>
     <div class="card gold"><h4>Top 10 Loại hình cơ sở</h4>${bars(s.byType)}</div>
     <div class="card slate"><h4>Phân bố theo Phường / Xã</h4>${bars(s.byWard)}</div>
   </div>`;
@@ -297,11 +299,11 @@ async function facilities() {
     <input id="q" placeholder="🔍 Tìm tên cơ sở, số hồ sơ, mã tài khoản, địa chỉ..." value="${esc(fq.q)}">
     <select id="lv">
       <option value="">Tất cả lĩnh vực (1–10)</option>
-      ${LV_IDS.map((id) => `<option value="${id}" ${fq.linhVuc === id ? 'selected' : ''}>ID ${id}: ${esc(LINH_VUC_MAP[id])}</option>`).join('')}
+      ${LV_IDS.map((id) => `<option value="${id}" ${fq.linhVuc === id ? 'selected' : ''}>Lĩnh vực ${id}: ${esc(LINH_VUC_MAP[id])}</option>`).join('')}
     </select>
     <select id="lh">
       <option value="">Tất cả loại hình (${filteredTypes.length})</option>
-      ${filteredTypes.map((t) => `<option value="${esc(t.ten)}" ${t.ten === fq.loaiHinh ? 'selected' : ''}>[${esc(t.maLoaiHinh || t.linhVuc)}] ${esc(t.ten)}</option>`).join('')}
+      ${filteredTypes.map((t) => `<option value="${esc(t.ten)}" ${t.ten === fq.loaiHinh ? 'selected' : ''}>${esc(t.ten)}</option>`).join('')}
     </select>
     <select id="tt">
       <option value="hoatdong">Đang hoạt động</option>
@@ -314,25 +316,22 @@ async function facilities() {
     <thead><tr>
       <th>Tên cơ sở &amp; Hồ sơ</th>
       <th>Địa chỉ</th>
-      <th>Thuộc lĩnh vực (ID cha)</th>
+      <th>Thuộc lĩnh vực</th>
       <th>Loại hình cơ sở</th>
       <th>Quy mô</th>
       <th>Kiểm tra cuối</th>
       <th>Thao tác</th>
     </tr></thead>
     <tbody>
-    ${d.items.map((f) => {
-      const code = f.maLoaiHinh || TYPES.find((t) => t.ten === f.loaiHinh)?.maLoaiHinh || '';
-      return `<tr>
+    ${d.items.map((f) => `<tr>
         <td><b>${esc(f.ten)}</b><br><small style="color:#64748b">${esc(f.soHoSo || f.soTaiKhoan || '')}</small> ${f.trangThai === 'giam' ? '<span class="tag red">Đã giảm</span>' : ''}</td>
         <td>${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))}</td>
         <td>${renderLvBadge(f.linhVuc)}</td>
-        <td>${code ? `<span class="code-pill">${esc(code)}</span>` : ''}${esc(f.loaiHinh || '—')}</td>
+        <td>${esc(f.loaiHinh || '—')}</td>
         <td style="white-space:nowrap">${f.soTang ? `${f.soTang} tầng` : ''}${f.soTangHam ? ` (${f.soTangHam} hầm)` : ''}<br><small style="color:#64748b">${f.dienTichSan ? `${f.dienTichSan} m² sàn` : (f.dienTichMatBang ? `${f.dienTichMatBang} m² MB` : '')}</small></td>
         <td>${esc(f.lanKiemTraCuoi || '—')}</td>
         <td style="white-space:nowrap"><button class="sm" data-edit="${f._id}">Sửa</button> <a class="btn sm amber" href="#/new-inspection/${f._id}">Kiểm tra</a> <button class="sm sec" data-del="${f._id}">Xóa</button></td>
-      </tr>`;
-    }).join('')}
+      </tr>`).join('')}
     </tbody>
   </table></div>
   <div class="pager">
@@ -372,17 +371,17 @@ async function types() {
     const items = TYPES.filter((t) => {
       if (parentLvId(t.linhVuc) !== id) return false;
       if (!qLow) return true;
-      return (t.ten || '').toLowerCase().includes(qLow) || (t.maLoaiHinh || '').toLowerCase().includes(qLow);
+      return (t.ten || '').toLowerCase().includes(qLow);
     });
     if (!items.length && qLow) return '';
     const totalFacs = items.reduce((s, t) => s + (t.soCoSo || 0), 0);
     return `<div class="lv-group" data-group="${id}">
       <div class="lv-group-head">
         <div class="lv-group-title">
-          <span class="lv-id-circle">ID: ${id}</span>
+          <span class="lv-id-circle">Lĩnh vực ${id}</span>
           <div>
-            <div>Lĩnh vực ${id}: ${esc(LINH_VUC_MAP[id])}</div>
-            <small style="color:#64748b;font-weight:500">ID lĩnh vực cha: <b>${id}</b> · Gồm ${items.length} loại hình cơ sở riêng</small>
+            <div>${esc(LINH_VUC_MAP[id])}</div>
+            <small style="color:#64748b;font-weight:500">Gồm ${items.length} loại hình cơ sở riêng</small>
           </div>
         </div>
         <div class="lv-group-meta">
@@ -393,18 +392,18 @@ async function types() {
       <div class="lv-group-body">
         <table>
           <thead><tr>
-            <th style="width:90px">Mã LH</th>
+            <th style="width:60px">STT</th>
             <th>Tên loại hình cơ sở riêng</th>
-            <th style="width:150px">Thuộc lĩnh vực (ID cha)</th>
+            <th style="width:150px">Thuộc lĩnh vực</th>
             <th style="width:110px">Số cơ sở</th>
             <th style="width:130px">Chu kỳ KT</th>
             ${isAdmin ? '<th style="width:120px">Thao tác</th>' : ''}
           </tr></thead>
           <tbody>
-            ${items.map((t) => `<tr>
-              <td><span class="code-pill">${esc(t.maLoaiHinh || id)}</span></td>
+            ${items.map((t, idx) => `<tr>
+              <td style="color:#64748b;font-weight:600">${idx + 1}</td>
               <td><b>${esc(t.ten)}</b>${t.moTa ? `<br><small style="color:#64748b">${esc(t.moTa)}</small>` : ''}</td>
-              <td><span class="lv-badge"><b>ID: ${id}</b> Lĩnh vực ${id}</span></td>
+              <td><span class="lv-badge">Lĩnh vực ${id}</span></td>
               <td>${t.soCoSo ? `<span class="tag green">${t.soCoSo} cơ sở</span>` : '<span style="color:#94a3b8">0</span>'}</td>
               <td>${t.chuKyKiemTraThang ? `${esc(t.chuKyKiemTraThang)} tháng` : '—'}</td>
               ${isAdmin ? `<td style="white-space:nowrap"><button class="sm" data-e="${t._id}">Sửa</button> <button class="sm sec" data-d="${t._id}">Xóa</button></td>` : ''}
@@ -418,15 +417,15 @@ async function types() {
   app.innerHTML = `<div class="page-head">
     <div>
       <h2>🗂️ Danh mục Loại hình cơ sở PCCC (${TYPES.length} loại hình / 10 lĩnh vực)</h2>
-      <p class="sub-note">Chuẩn hóa theo 10 nhóm lĩnh vực PCCC — gom nhóm theo ID lĩnh vực cha (1–10)</p>
+      <p class="sub-note">Chuẩn hóa và gom nhóm theo 10 lĩnh vực PCCC</p>
     </div>
     ${isAdmin ? '<button class="ok" id="add">+ Thêm loại hình</button>' : ''}
   </div>
   <div class="bar">
-    <input id="tq" placeholder="🔍 Tìm theo mã (vd 1.4, 4.22) hoặc tên loại hình..." value="${esc(tFilter.q)}" style="flex:1;min-width:240px">
+    <input id="tq" placeholder="🔍 Tìm theo tên loại hình cơ sở..." value="${esc(tFilter.q)}" style="flex:1;min-width:240px">
     <select id="tlv">
       <option value="">Tất cả 10 nhóm lĩnh vực</option>
-      ${LV_IDS.map((id) => `<option value="${id}" ${tFilter.lv === id ? 'selected' : ''}>ID ${id}: ${esc(LINH_VUC_MAP[id])}</option>`).join('')}
+      ${LV_IDS.map((id) => `<option value="${id}" ${tFilter.lv === id ? 'selected' : ''}>Lĩnh vực ${id}: ${esc(LINH_VUC_MAP[id])}</option>`).join('')}
     </select>
     <button id="tgo">Lọc</button>
     <button class="sec" id="toggleAll">Thu gọn / Mở rộng tất cả</button>
@@ -450,17 +449,16 @@ async function types() {
     const curLv = parentLvId(t?.linhVuc) || '1';
     modal(`<h3>${t ? 'Sửa loại hình cơ sở' : 'Thêm loại hình cơ sở mới'}</h3>
     <div class="grid">
-      <div><label>Thuộc lĩnh vực (ID cha 1–10) *</label>
-        <select id="t_lv">${LV_IDS.map((id) => `<option value="${id}" ${id === curLv ? 'selected' : ''}>ID ${id}: ${esc(LINH_VUC_MAP[id])}</option>`).join('')}</select>
+      <div><label>Thuộc lĩnh vực (1–10) *</label>
+        <select id="t_lv">${LV_IDS.map((id) => `<option value="${id}" ${id === curLv ? 'selected' : ''}>Lĩnh vực ${id}: ${esc(LINH_VUC_MAP[id])}</option>`).join('')}</select>
       </div>
-      <div><label>Mã loại hình con (vd 1.13)</label><input id="t_ma" value="${esc(t?.maLoaiHinh || '')}" placeholder="Ví dụ: 1.13"></div>
-      <div class="full"><label>Tên loại hình cơ sở *</label><input id="t_ten" value="${esc(t?.ten || '')}"></div>
       <div><label>Chu kỳ kiểm tra (tháng)</label><input id="t_ck" type="number" value="${esc(t?.chuKyKiemTraThang ?? '')}"></div>
+      <div class="full"><label>Tên loại hình cơ sở *</label><input id="t_ten" value="${esc(t?.ten || '')}"></div>
       <div class="full"><label>Ghi chú / Mô tả</label><textarea id="t_mt">${esc(t?.moTa || '')}</textarea></div>
     </div>
     <p><button id="save">Lưu</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
     $('#save').onclick = safe(async () => {
-      const b = { maLoaiHinh: $('#t_ma').value.trim(), ten: $('#t_ten').value.trim(), linhVuc: $('#t_lv').value, chuKyKiemTraThang: $('#t_ck').value, moTa: $('#t_mt').value };
+      const b = { ten: $('#t_ten').value.trim(), linhVuc: $('#t_lv').value, chuKyKiemTraThang: $('#t_ck').value, moTa: $('#t_mt').value };
       await api(t ? '/types/' + t._id : '/types', t ? 'PUT' : 'POST', b); closeModal(); route();
     });
   };

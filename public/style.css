@@ -126,9 +126,9 @@ tbody tr:last-child td{border-bottom:0}
 .login-field input{width:100%;padding:11px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:14px;background:#fff;color:#111;transition:border-color .15s,box-shadow .15s;position:relative;z-index:1}
 .login-field input:focus{outline:none;border-color:#dc2626;box-shadow:0 0 0 3px rgba(220,38,38,.15)}
 .pw-wrap{position:relative;display:flex;align-items:center}
-.pw-wrap input{padding-right:64px}
-.pw-toggle{position:absolute;right:6px;z-index:2;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;width:auto!important;box-shadow:none}
-.pw-toggle:hover{background:#e5e7eb}
+.pw-wrap input{padding-right:44px}
+.pw-toggle{position:absolute;right:6px;z-index:2;background:transparent;color:#6b7280;border:0;border-radius:6px;padding:6px;cursor:pointer;width:auto!important;box-shadow:none;display:inline-flex;align-items:center;justify-content:center}
+.pw-toggle:hover{background:#f3f4f6;color:#111827;filter:none}
 .login .err{color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:12px;display:none}
 .login .err:not(:empty){display:block}
 .login button.submit-btn{width:100%;padding:12px;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;background:linear-gradient(135deg,#dc2626,#991b1b);border:1px solid #7f1d1d;border-radius:8px;box-shadow:0 4px 12px rgba(185,28,28,.35)}

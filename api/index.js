@@ -25,21 +25,33 @@ const clean = (body, allowed) => {
 };
 
 const FAC_FIELDS = [
-  'soHoSo', 'soTaiKhoan', 'ten', 'soNha', 'khuPho', 'phuong', 'linhVuc', 'tenLinhVuc', 'maLoaiHinh', 'loaiHinh',
+  'soHoSo', 'soTaiKhoan', 'ten', 'soNha', 'khuPho', 'phuong', 'linhVuc', 'tenLinhVuc', 'loaiHinh',
   'thangNamHoatDong', 'soTang', 'khoiTich', 'dienTichSan', 'thongTinDacThu', 'phanLoai',
   'thamDuyet', 'tinhTrangViPham', 'donViQuanLy', 'ghiChu', 'nguoiDaiDien', 'dienThoai',
   'soTangHam', 'dienTichMatBang', 'nhomLoaiHinh',
 ];
-const { GROUPS, LINH_VUC_MAP, ALL_TYPES, normalizeFacilityType } = require('../lib/catalog');
+const { GROUPS, LINH_VUC_MAP, normalizeWard, normalizeFacilityType } = require('../lib/catalog');
 const num = (o, ks) => ks.forEach((k) => { if (o[k] !== undefined && o[k] !== '') o[k] = Number(o[k]); });
 
+// Cache ngắn hạn trên bộ nhớ Serverless (60s) cho types & stats, tự xóa khi có thao tác ghi
+const MEM_CACHE = new Map();
+const getCache = (k) => {
+  const e = MEM_CACHE.get(k);
+  return e && e.exp > Date.now() ? e.val : null;
+};
+const setCache = (k, val, ttlMs = 60000) => MEM_CACHE.set(k, { val, exp: Date.now() + ttlMs });
+app.use('/api', (req, res, next) => {
+  if (req.method !== 'GET') MEM_CACHE.clear();
+  next();
+});
+
 function applyLinhVucFromType(d) {
-  if (d.loaiHinh || d.maLoaiHinh) {
+  if (d.phuong !== undefined) d.phuong = normalizeWard(d.phuong);
+  if (d.loaiHinh) {
     const std = normalizeFacilityType(d);
     if (std) {
       d.linhVuc = String(std.linhVuc); // Luôn lấy ID của phần cha (1..10)
       d.tenLinhVuc = std.tenLinhVuc;
-      if (!d.maLoaiHinh) d.maLoaiHinh = std.maLoaiHinh;
     }
   } else if (d.linhVuc) {
     const parentId = String(d.linhVuc).split('.')[0].replace(/\D/g, '');
@@ -56,25 +68,29 @@ app.get('/api/catalog', (req, res) => {
 });
 
 app.get('/api/types', wrap(async (req, res) => {
+  const cached = getCache('types');
+  if (cached) return res.json(cached);
   const db = await getDb();
   const [types, counts] = await Promise.all([
-    db.collection('types').find().sort({ thuTu: 1, maLoaiHinh: 1, ten: 1 }).toArray(),
+    db.collection('types').find().sort({ thuTu: 1, ten: 1 }).toArray(),
     db.collection('facilities').aggregate([
       { $match: { trangThai: 'hoatdong' } },
       { $group: { _id: '$loaiHinh', count: { $sum: 1 } } },
     ]).toArray(),
   ]);
   const countMap = Object.fromEntries(counts.map((c) => [c._id, c.count]));
-  res.json(types.map((t) => ({
+  const result = types.map((t) => ({
     ...t,
     linhVuc: String(t.linhVuc || '').split('.')[0] || '1',
     tenLinhVuc: t.tenLinhVuc || LINH_VUC_MAP[String(t.linhVuc || '').split('.')[0]] || '',
     soCoSo: countMap[t.ten] || 0,
-  })));
+  }));
+  setCache('types', result);
+  res.json(result);
 }));
 app.post('/api/types', wrap(async (req, res) => {
   const db = await getDb();
-  const d = clean(req.body, ['maLoaiHinh', 'ten', 'linhVuc', 'moTa', 'chuKyKiemTraThang']);
+  const d = clean(req.body, ['ten', 'linhVuc', 'moTa', 'chuKyKiemTraThang']);
   if (!d.ten) return res.status(400).json({ error: 'Thiếu tên loại hình' });
   d.linhVuc = String(d.linhVuc || '1').split('.')[0];
   d.tenLinhVuc = LINH_VUC_MAP[d.linhVuc] || '';
@@ -84,7 +100,7 @@ app.post('/api/types', wrap(async (req, res) => {
 }));
 app.put('/api/types/:id', wrap(async (req, res) => {
   const db = await getDb();
-  const d = clean(req.body, ['maLoaiHinh', 'ten', 'linhVuc', 'moTa', 'chuKyKiemTraThang']);
+  const d = clean(req.body, ['ten', 'linhVuc', 'moTa', 'chuKyKiemTraThang']);
   if (d.linhVuc) {
     d.linhVuc = String(d.linhVuc).split('.')[0];
     d.tenLinhVuc = LINH_VUC_MAP[d.linhVuc] || '';
@@ -243,6 +259,8 @@ app.delete('/api/changes/:id', wrap(async (req, res) => {
 
 /* ---------- Thống kê ---------- */
 app.get('/api/stats', wrap(async (req, res) => {
+  const cached = getCache('stats');
+  if (cached) return res.json(cached);
   const db = await getDb();
   const facs = db.collection('facilities');
   const act = { trangThai: 'hoatdong' };
@@ -255,7 +273,9 @@ app.get('/api/stats', wrap(async (req, res) => {
     db.collection('changes').countDocuments({ loai: 'giam' }),
     db.collection('inspections').countDocuments(),
   ]);
-  res.json({ total, byType, byWard, byField, tang, giam, inspections });
+  const result = { total, byType, byWard, byField, tang, giam, inspections };
+  setCache('stats', result);
+  res.json(result);
 }));
 
 module.exports = app;
