@@ -3,23 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quản lý cơ sở PCCC</title>
+<title>Hệ thống Quản lý Cơ sở PCCC & CNCH</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="authView" class="hidden"></div>
 <div id="shell" class="hidden">
 <aside id="nav">
-  <h1>🔥 PCCC</h1>
-  <a href="#/">Tổng quan</a>
-  <a href="#/facilities">Cơ sở</a>
-  <a href="#/inspections">Kiểm tra</a>
-  <a href="#/changes">Tăng / giảm</a>
-  <div class="adminOnly"><small>QUẢN TRỊ</small>
-    <a href="#/types">Loại hình cơ sở</a>
-    <a href="#/users">Tài khoản</a>
-    <a href="#/logs">Nhật ký đăng nhập</a>
+  <div class="brand">
+    <div class="brand-icon">🛡️</div>
+    <div>
+      <h1>PCCC &amp; CNCH</h1>
+      <span>Quản lý cơ sở nghiệp vụ</span>
+    </div>
   </div>
+  <nav class="nav-links">
+    <small>NGHIỆP VỤ</small>
+    <a href="#/">📊 Tổng quan</a>
+    <a href="#/facilities">🏢 Danh sách cơ sở</a>
+    <a href="#/types">🗂️ Loại hình cơ sở</a>
+    <a href="#/inspections">📋 Biên bản kiểm tra</a>
+    <a href="#/changes">📈 Tăng / giảm cơ sở</a>
+    <div class="adminOnly">
+      <small>QUẢN TRỊ HỆ THỐNG</small>
+      <a href="#/users">👥 Quản lý tài khoản</a>
+      <a href="#/logs">🕒 Nhật ký đăng nhập</a>
+    </div>
+  </nav>
   <div id="me"></div>
 </aside>
 <main id="app"></main>

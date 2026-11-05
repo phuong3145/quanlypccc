@@ -2,6 +2,21 @@ const $ = (s) => document.querySelector(s);
 const app = $('#app');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+const LINH_VUC_MAP = {
+  '1': 'Nhà ở, Trụ sở & Bưu chính',
+  '2': 'Y tế & Trợ giúp xã hội',
+  '3': 'Giáo dục & Nghiên cứu',
+  '4': 'Văn hóa, Thể thao, Giải trí & Lưu trú',
+  '5': 'Thương mại & Dịch vụ',
+  '6': 'Giao thông, Hạ tầng & Bãi xe',
+  '7': 'Năng lượng & Điện lực',
+  '8': 'Dầu khí, Xăng dầu & Khí đốt',
+  '9': 'Hóa chất, Vật liệu nổ & Công nghiệp nguy hiểm',
+  '10': 'Sản xuất Công nghiệp & Kho hàng',
+};
+const LV_IDS = Object.keys(LINH_VUC_MAP);
+const parentLvId = (v) => String(v ?? '').split('.')[0].replace(/\D/g, '') || '';
+
 let ME = null;
 async function api(path, method = 'GET', body) {
   const r = await fetch('/api' + path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
@@ -17,39 +32,97 @@ function closeModal() { $('#modal').classList.add('hidden'); }
 $('#modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal') closeModal(); });
 
 const FIELDS = [
-  ['ten', 'Tên cơ sở *', 'full'], ['soHoSo', 'Số hồ sơ'], ['soTaiKhoan', 'Số tài khoản'],
-  ['soNha', 'Số nhà, đường'], ['khuPho', 'Khu phố / KCN'], ['phuong', 'Phường / xã'], ['linhVuc', 'Thuộc lĩnh vực'],
-  ['loaiHinh', 'Loại hình cơ sở', 'type'], ['thangNamHoatDong', 'Tháng/năm hoạt động (vd 03/2020)'],
-  ['soTang', 'Số tầng (nổi)', 'number'], ['soTangHam', 'Số tầng hầm', 'number'], ['dienTichMatBang', 'Diện tích mặt bằng (m2)', 'number'], ['khoiTich', 'Khối tích (m3)', 'number'], ['dienTichSan', 'Tổng diện tích sàn (m2)', 'number'],
-  ['thongTinDacThu', 'Thông tin đặc thù', 'full'], ['nhomLoaiHinh', 'Nhóm loại hình (theo 10 lĩnh vực)', 'full'],
-  ['phanLoai', 'Phân loại theo NĐ 136', 'select', ['', 'Ngoài Phụ lục II', 'Nhóm 1 - Phụ lục II', 'Nhóm 2 - Phụ lục II', 'Phụ lục III', 'Phụ lục VII']],
-  ['thamDuyet', 'Thẩm duyệt/nghiệm thu', 'select', ['', 'Đã thẩm duyệt, nghiệm thu', 'Đã thẩm duyệt, chưa nghiệm thu', 'Chưa được thẩm duyệt, nghiệm thu']],
-  ['tinhTrangViPham', 'Tình trạng vi phạm', 'full'], ['nguoiDaiDien', 'Người đại diện'], ['dienThoai', 'Điện thoại'],
-  ['donViQuanLy', 'Đơn vị quản lý'], ['ghiChu', 'Ghi chú'],
+  ['ten', 'Tên cơ sở *', 'full'],
+  ['soHoSo', 'Số hồ sơ'],
+  ['soTaiKhoan', 'Số tài khoản'],
+  ['loaiHinh', 'Loại hình cơ sở *', 'type'],
+  ['linhVuc', 'Thuộc lĩnh vực (ID cha 1–10)', 'linhvuc'],
+  ['soNha', 'Số nhà, tên đường'],
+  ['khuPho', 'Khu phố / KCN'],
+  ['phuong', 'Phường / xã'],
+  ['thangNamHoatDong', 'Tháng/năm hoạt động (vd 03/2020)'],
+  ['soTang', 'Số tầng (nổi)', 'number'],
+  ['soTangHam', 'Số tầng hầm', 'number'],
+  ['dienTichMatBang', 'Diện tích mặt bằng (m²)', 'number'],
+  ['dienTichSan', 'Tổng diện tích sàn (m²)', 'number'],
+  ['khoiTich', 'Khối tích (m³)', 'number'],
+  ['thongTinDacThu', 'Thông tin đặc thù', 'full'],
+  ['phanLoai', 'Phân loại theo Nghị định', 'select', ['', 'Ngoài Phụ lục II', 'Nhóm 1 - Phụ lục II', 'Nhóm 2 - Phụ lục II', 'Phụ lục III', 'Phụ lục VII', 'UBND cấp xã quản lý']],
+  ['thamDuyet', 'Thẩm duyệt / nghiệm thu', 'select', ['', 'Đã thẩm duyệt, nghiệm thu', 'Đã thẩm duyệt, chưa nghiệm thu', 'Chưa được thẩm duyệt, nghiệm thu']],
+  ['tinhTrangViPham', 'Tình trạng vi phạm', 'full'],
+  ['nguoiDaiDien', 'Người đại diện / Cán bộ phụ trách'],
+  ['dienThoai', 'Số điện thoại'],
+  ['donViQuanLy', 'Đơn vị quản lý'],
+  ['ghiChu', 'Ghi chú'],
 ];
+
 let TYPES = [];
 const loadTypes = async () => (TYPES = await api('/types'));
 
+function renderLvBadge(lv) {
+  const pid = parentLvId(lv);
+  if (!pid) return '<span class="tag">—</span>';
+  const name = LINH_VUC_MAP[pid] || '';
+  return `<span class="lv-badge" title="${esc(name)}"><b>ID: ${esc(pid)}</b> Lĩnh vực ${esc(pid)}</span>${name ? `<span class="lv-sub">${esc(name)}</span>` : ''}`;
+}
+
 function facilityForm(f = {}, prefix = 'f') {
-  return `<datalist id="dlTypes">${TYPES.map((t) => `<option value="${esc(t.ten)}">`).join('')}</datalist><div class="grid">` +
+  const curLv = parentLvId(f.linhVuc) || '1';
+  const groupedOptions = LV_IDS.map((id) => {
+    const items = TYPES.filter((t) => parentLvId(t.linhVuc) === id);
+    if (!items.length) return '';
+    return `<optgroup label="Lĩnh vực ${id}: ${esc(LINH_VUC_MAP[id])}">${items
+      .map((t) => `<option value="${esc(t.ten)}" data-lv="${id}" data-ma="${esc(t.maLoaiHinh || '')}" ${t.ten === f.loaiHinh ? 'selected' : ''}>[${esc(t.maLoaiHinh || id)}] ${esc(t.ten)}</option>`)
+      .join('')}</optgroup>`;
+  }).join('');
+  const extraOpt = f.loaiHinh && !TYPES.some((t) => t.ten === f.loaiHinh)
+    ? `<option value="${esc(f.loaiHinh)}" selected>${esc(f.loaiHinh)}</option>` : '';
+
+  return `<div class="grid">` +
     FIELDS.map(([k, label, kind, opts]) => {
       const id = `${prefix}_${k}`, v = esc(f[k] ?? '');
       let input;
-      if (kind === 'select') input = `<select id="${id}">${(f[k] && !opts.includes(f[k]) ? [...opts, f[k]] : opts).map((o) => `<option ${o === f[k] ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
-      else input = `<input id="${id}" value="${v}" ${kind === 'type' ? 'list="dlTypes"' : ''} ${kind === 'number' ? 'type="number" step="any"' : ''}>`;
-      return `<div class="${kind === 'full' ? 'full' : ''}"><label>${label}</label>${input}</div>`;
+      if (kind === 'type') {
+        input = `<select id="${id}"><option value="">-- Chọn loại hình cơ sở --</option>${extraOpt}${groupedOptions}</select>`;
+      } else if (kind === 'linhvuc') {
+        input = `<select id="${id}">${LV_IDS.map((lid) => `<option value="${lid}" ${lid === curLv ? 'selected' : ''}>ID: ${lid} — ${esc(LINH_VUC_MAP[lid])}</option>`).join('')}</select>`;
+      } else if (kind === 'select') {
+        const list = f[k] && !opts.includes(f[k]) ? [...opts, f[k]] : opts;
+        input = `<select id="${id}">${list.map((o) => `<option ${o === f[k] ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+      } else {
+        input = `<input id="${id}" value="${v}" ${kind === 'number' ? 'type="number" step="any"' : ''}>`;
+      }
+      return `<div class="${kind === 'full' ? 'full' : ''}"><label for="${id}">${label}</label>${input}</div>`;
     }).join('') + '</div>';
 }
-const readForm = (prefix = 'f') => Object.fromEntries(FIELDS.map(([k]) => [k, $(`#${prefix}_${k}`).value.trim()]));
+
+function bindFacilityFormEvents(prefix = 'f') {
+  const typeSel = $(`#${prefix}_loaiHinh`);
+  const lvSel = $(`#${prefix}_linhVuc`);
+  if (typeSel && lvSel) {
+    typeSel.onchange = () => {
+      const opt = typeSel.selectedOptions[0];
+      if (opt && opt.dataset.lv) lvSel.value = opt.dataset.lv;
+    };
+  }
+}
+
+const readForm = (prefix = 'f') => {
+  const obj = Object.fromEntries(FIELDS.map(([k]) => [k, $(`#${prefix}_${k}`).value.trim()]));
+  const opt = $(`#${prefix}_loaiHinh`)?.selectedOptions?.[0];
+  if (opt?.dataset?.ma) obj.maLoaiHinh = opt.dataset.ma;
+  if (opt?.dataset?.lv) obj.linhVuc = opt.dataset.lv; // Đảm bảo luôn lưu ID của phần cha (1..10)
+  return obj;
+};
 
 /* ---------- Router ---------- */
 const routes = { '': dashboard, facilities, types, inspections, changes, users, logs, 'inspection': inspectionPrint, 'new-inspection': inspectionForm };
-const ADMIN_ROUTES = ['types', 'users', 'logs'];
+const ADMIN_ROUTES = ['users', 'logs'];
 async function route() {
   if (!ME) return;
   const [name, arg] = location.hash.replace(/^#\/?/, '').split('/');
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === `#/${name}`));
-  app.innerHTML = 'Đang tải...';
+  app.innerHTML = 'Đang tải dữ liệu...';
   try {
     if (ADMIN_ROUTES.includes(name) && ME.role !== 'admin') throw new Error('Chỉ quản trị viên được truy cập');
     await loadTypes(); await (routes[name] || dashboard)(arg);
@@ -59,10 +132,9 @@ window.addEventListener('hashchange', route);
 
 /* ---------- Đăng nhập / khởi động ---------- */
 const ROLE_NAME = { admin: 'Quản trị viên', canbo: 'Cán bộ', xem: 'Chỉ xem' };
-// Ẩn nút thao tác ghi với tài khoản chỉ xem
 new MutationObserver(() => {
   if (!ME || ME.role !== 'xem') return;
-  app.querySelectorAll('#add,#tang,#giam,[data-edit],[data-del],[data-d],a[href^="#/new-inspection"]').forEach((e) => e.remove());
+  app.querySelectorAll('#add,#tang,#giam,[data-edit],[data-del],[data-d],[data-e],a[href^="#/new-inspection"]').forEach((e) => e.remove());
 }).observe(app, { childList: true, subtree: true });
 
 function authScreen(setup) {
@@ -122,12 +194,13 @@ function authScreen(setup) {
   };
   setTimeout(() => (setup ? $('#a_name') : $('#a_user'))?.focus(), 50);
 }
+
 function start() {
   $('#authView').classList.add('hidden');
   $('#shell').classList.remove('hidden');
   document.querySelectorAll('.adminOnly').forEach((e) => e.classList.toggle('hidden', ME.role !== 'admin'));
-  $('#me').innerHTML = `<b>${esc(ME.hoTen)}</b><br><small>${ROLE_NAME[ME.role]}</small><br>
-    <button class="sm sec" id="chpw">Đổi mật khẩu</button><button class="sm sec" id="logout">Đăng xuất</button>`;
+  $('#me').innerHTML = `<b>👤 ${esc(ME.hoTen)}</b><small>${ROLE_NAME[ME.role]}</small>
+    <button class="sm sec" id="chpw">Đổi MK</button><button class="sm sec" id="logout">Đăng xuất</button>`;
   $('#logout').onclick = async () => { await api('/auth/logout', 'POST').catch(() => {}); ME = null; boot(); };
   $('#chpw').onclick = () => {
     modal(`<h3>Đổi mật khẩu</h3><div class="grid"><div class="full"><label>Mật khẩu cũ</label><input id="p0" type="password"></div>
@@ -147,12 +220,12 @@ boot();
 /* ---------- Quản trị: tài khoản ---------- */
 async function users() {
   const list = await api('/admin/users');
-  app.innerHTML = `<h2>Quản lý tài khoản</h2><div class="bar"><button class="ok" id="add">+ Cấp tài khoản</button></div>
-  <table><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th>Đăng nhập cuối</th><th></th></tr>
-  ${list.map((u) => `<tr><td>${esc(u.username)}</td><td>${esc(u.hoTen)}</td><td>${ROLE_NAME[u.role]}</td>
+  app.innerHTML = `<div class="page-head"><div><h2>👥 Quản lý tài khoản</h2><p class="sub-note">Cấp phát và phân quyền truy cập hệ thống</p></div><button class="ok" id="add">+ Cấp tài khoản</button></div>
+  <div class="table-wrap"><table><thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th>Đăng nhập cuối</th><th>Thao tác</th></tr></thead><tbody>
+  ${list.map((u) => `<tr><td><b>${esc(u.username)}</b></td><td>${esc(u.hoTen)}</td><td><span class="tag blue">${ROLE_NAME[u.role]}</span></td>
   <td><span class="tag ${u.active ? 'green' : 'red'}">${u.active ? 'Hoạt động' : 'Đã khóa'}</span></td><td>${u.lastLogin ? new Date(u.lastLogin).toLocaleString('vi-VN') : '—'}</td>
   <td style="white-space:nowrap"><button class="sm" data-e="${u._id}">Sửa / đặt lại MK</button> <button class="sm sec" data-t="${u._id}">${u.active ? 'Khóa' : 'Mở khóa'}</button>
-  <button class="sm sec" data-o="${u._id}">Buộc đăng xuất</button> <button class="sm sec" data-x="${u._id}">Xóa</button></td></tr>`).join('')}</table>`;
+  <button class="sm sec" data-o="${u._id}">Buộc đăng xuất</button> <button class="sm sec" data-x="${u._id}">Xóa</button></td></tr>`).join('')}</tbody></table></div>`;
   const form = (u) => {
     modal(`<h3>${u ? 'Sửa tài khoản ' + esc(u.username) : 'Cấp tài khoản mới'}</h3><div class="grid">
     ${u ? '' : '<div><label>Tên đăng nhập *</label><input id="u_name"></div>'}
@@ -180,71 +253,220 @@ async function users() {
 /* ---------- Quản trị: nhật ký đăng nhập ---------- */
 async function logs() {
   const list = await api('/admin/logs');
-  app.innerHTML = `<h2>Nhật ký đăng nhập (200 gần nhất)</h2><table><tr><th>Thời gian</th><th>Tài khoản</th><th>IP</th><th>Kết quả</th></tr>
-  ${list.map((l) => `<tr><td>${new Date(l.at).toLocaleString('vi-VN')}</td><td>${esc(l.username)}</td><td>${esc(l.ip)}</td>
-  <td><span class="tag ${l.ok ? 'green' : 'red'}">${l.ok ? 'Thành công' : esc(l.note || 'Thất bại')}</span></td></tr>`).join('')}</table>`;
+  app.innerHTML = `<div class="page-head"><div><h2>🕒 Nhật ký đăng nhập</h2><p class="sub-note">200 lượt truy cập gần nhất</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Tài khoản</th><th>Địa chỉ IP</th><th>Kết quả</th></tr></thead><tbody>
+  ${list.map((l) => `<tr><td>${new Date(l.at).toLocaleString('vi-VN')}</td><td><b>${esc(l.username)}</b></td><td>${esc(l.ip)}</td>
+  <td><span class="tag ${l.ok ? 'green' : 'red'}">${l.ok ? 'Thành công' : esc(l.note || 'Thất bại')}</span></td></tr>`).join('')}</tbody></table></div>`;
 }
 
 /* ---------- Tổng quan ---------- */
 async function dashboard() {
   const s = await api('/stats');
-  const bars = (arr) => { const m = Math.max(1, ...arr.map((x) => x.n)); return `<div class="bars">${arr.map((x) => `<div><span style="width:170px">${esc(x._id || '(trống)')}</span><i style="width:${(x.n / m) * 200}px"></i> ${x.n}</div>`).join('')}</div>`; };
-  app.innerHTML = `<h2>Tổng quan</h2>
-  <div class="cards"><div class="card"><b>${s.total}</b>Cơ sở đang quản lý</div><div class="card"><b>${s.tang}</b>Lượt tăng</div><div class="card"><b>${s.giam}</b>Lượt giảm</div><div class="card"><b>${s.inspections}</b>Biên bản kiểm tra</div></div>
-  <div class="cards" style="grid-template-columns:1fr 1fr"><div class="card"><h4>Theo loại hình (top 10)</h4>${bars(s.byType)}</div><div class="card"><h4>Theo phường/xã</h4>${bars(s.byWard)}</div></div>`;
+  const bars = (arr, labelFn = (x) => x._id || '(trống)') => {
+    const m = Math.max(1, ...arr.map((x) => x.n));
+    return `<div class="bars">${arr.map((x) => `<div><span class="lbl" title="${esc(labelFn(x))}">${esc(labelFn(x))}</span><div class="track"><i style="width:${Math.max(4, (x.n / m) * 100)}%"></i></div><b class="val">${x.n}</b></div>`).join('')}</div>`;
+  };
+  const fieldItems = [...(s.byField || [])].sort((a, b) => Number(a._id || 99) - Number(b._id || 99));
+  app.innerHTML = `<div class="page-head"><div><h2>📊 Tổng quan công tác quản lý PCCC</h2><p class="sub-note">Thống kê số liệu cơ sở theo 10 lĩnh vực và địa bàn quản lý</p></div></div>
+  <div class="cards">
+    <div class="card"><b>${s.total}</b>Cơ sở đang quản lý</div>
+    <div class="card gold"><b>${LV_IDS.length}</b>Nhóm lĩnh vực PCCC (${TYPES.length} loại hình)</div>
+    <div class="card green"><b>${s.tang} / ${s.giam}</b>Lượt Tăng / Giảm cơ sở</div>
+    <div class="card slate"><b>${s.inspections}</b>Biên bản kiểm tra đã lập</div>
+  </div>
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr))">
+    <div class="card"><h4>Phân bố theo 10 Lĩnh vực PCCC (ID cha)</h4>${bars(fieldItems, (x) => `ID ${x._id}: ${LINH_VUC_MAP[x._id] || 'Khác'}`)}</div>
+    <div class="card gold"><h4>Top 10 Loại hình cơ sở</h4>${bars(s.byType)}</div>
+    <div class="card slate"><h4>Phân bố theo Phường / Xã</h4>${bars(s.byWard)}</div>
+  </div>`;
 }
 
 /* ---------- Cơ sở ---------- */
-let fq = { q: '', loaiHinh: '', phuong: '', trangThai: 'hoatdong', page: 1 };
+let fq = { q: '', linhVuc: '', loaiHinh: '', phuong: '', trangThai: 'hoatdong', page: 1 };
 async function facilities() {
   const qs = new URLSearchParams({ ...fq, limit: 20 });
   const d = await api('/facilities?' + qs);
   const pages = Math.max(1, Math.ceil(d.total / d.limit));
-  app.innerHTML = `<h2>Cơ sở (${d.total})</h2>
-  <div class="bar"><input id="q" placeholder="Tìm tên, số hồ sơ, địa chỉ..." value="${esc(fq.q)}">
-  <select id="lh"><option value="">Mọi loại hình</option>${TYPES.map((t) => `<option ${t.ten === fq.loaiHinh ? 'selected' : ''}>${esc(t.ten)}</option>`).join('')}</select>
-  <select id="tt"><option value="hoatdong">Đang hoạt động</option><option value="giam" ${fq.trangThai === 'giam' ? 'selected' : ''}>Đã giảm</option><option value="all" ${fq.trangThai === 'all' ? 'selected' : ''}>Tất cả</option></select>
-  <button id="go">Tìm</button><button class="ok" id="add">+ Thêm cơ sở</button></div>
-  <table><tr><th>Tên cơ sở</th><th>Địa chỉ</th><th>Loại hình</th><th>Quy mô</th><th>Kiểm tra cuối</th><th></th></tr>
-  ${d.items.map((f) => `<tr><td><b>${esc(f.ten)}</b><br><small>${esc(f.soHoSo || f.soTaiKhoan || '')}</small> ${f.trangThai === 'giam' ? '<span class="tag red">đã giảm</span>' : ''}</td>
-  <td>${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))}</td><td>${esc(f.loaiHinh)}</td>
-  <td>${f.soTang ?? ''} tầng<br>${f.dienTichSan ?? ''} m²</td><td>${esc(f.lanKiemTraCuoi || '—')}</td>
-  <td style="white-space:nowrap"><button class="sm" data-edit="${f._id}">Sửa</button> <a class="btn sm" href="#/new-inspection/${f._id}">Kiểm tra</a> <button class="sm sec" data-del="${f._id}">Xóa</button></td></tr>`).join('')}</table>
-  <div class="pager"><button class="sm sec" id="prev" ${fq.page <= 1 ? 'disabled' : ''}>‹</button> Trang ${d.page}/${pages} <button class="sm sec" id="next" ${fq.page >= pages ? 'disabled' : ''}>›</button></div>`;
-  const apply = () => { fq = { ...fq, q: $('#q').value, loaiHinh: $('#lh').value, trangThai: $('#tt').value, page: 1 }; facilities(); };
-  $('#go').onclick = apply; $('#q').onkeydown = (e) => e.key === 'Enter' && apply();
-  $('#prev').onclick = () => { fq.page--; facilities(); }; $('#next').onclick = () => { fq.page++; facilities(); };
-  $('#add').onclick = () => editFacility();
+  const filteredTypes = fq.linhVuc ? TYPES.filter((t) => parentLvId(t.linhVuc) === fq.linhVuc) : TYPES;
+
+  app.innerHTML = `<div class="page-head">
+    <div><h2>🏢 Danh sách cơ sở PCCC (${d.total})</h2><p class="sub-note">Quản lý hồ sơ, phân loại theo 10 lĩnh vực PCCC và kiểm tra định kỳ</p></div>
+    <button class="ok" id="add">+ Thêm cơ sở mới</button>
+  </div>
+  <div class="bar">
+    <input id="q" placeholder="🔍 Tìm tên cơ sở, số hồ sơ, mã tài khoản, địa chỉ..." value="${esc(fq.q)}">
+    <select id="lv">
+      <option value="">Tất cả lĩnh vực (1–10)</option>
+      ${LV_IDS.map((id) => `<option value="${id}" ${fq.linhVuc === id ? 'selected' : ''}>ID ${id}: ${esc(LINH_VUC_MAP[id])}</option>`).join('')}
+    </select>
+    <select id="lh">
+      <option value="">Tất cả loại hình (${filteredTypes.length})</option>
+      ${filteredTypes.map((t) => `<option value="${esc(t.ten)}" ${t.ten === fq.loaiHinh ? 'selected' : ''}>[${esc(t.maLoaiHinh || t.linhVuc)}] ${esc(t.ten)}</option>`).join('')}
+    </select>
+    <select id="tt">
+      <option value="hoatdong">Đang hoạt động</option>
+      <option value="giam" ${fq.trangThai === 'giam' ? 'selected' : ''}>Đã giảm</option>
+      <option value="all" ${fq.trangThai === 'all' ? 'selected' : ''}>Tất cả trạng thái</option>
+    </select>
+    <button id="go">Lọc kết quả</button>
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Tên cơ sở &amp; Hồ sơ</th>
+      <th>Địa chỉ</th>
+      <th>Thuộc lĩnh vực (ID cha)</th>
+      <th>Loại hình cơ sở</th>
+      <th>Quy mô</th>
+      <th>Kiểm tra cuối</th>
+      <th>Thao tác</th>
+    </tr></thead>
+    <tbody>
+    ${d.items.map((f) => {
+      const code = f.maLoaiHinh || TYPES.find((t) => t.ten === f.loaiHinh)?.maLoaiHinh || '';
+      return `<tr>
+        <td><b>${esc(f.ten)}</b><br><small style="color:#64748b">${esc(f.soHoSo || f.soTaiKhoan || '')}</small> ${f.trangThai === 'giam' ? '<span class="tag red">Đã giảm</span>' : ''}</td>
+        <td>${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))}</td>
+        <td>${renderLvBadge(f.linhVuc)}</td>
+        <td>${code ? `<span class="code-pill">${esc(code)}</span>` : ''}${esc(f.loaiHinh || '—')}</td>
+        <td style="white-space:nowrap">${f.soTang ? `${f.soTang} tầng` : ''}${f.soTangHam ? ` (${f.soTangHam} hầm)` : ''}<br><small style="color:#64748b">${f.dienTichSan ? `${f.dienTichSan} m² sàn` : (f.dienTichMatBang ? `${f.dienTichMatBang} m² MB` : '')}</small></td>
+        <td>${esc(f.lanKiemTraCuoi || '—')}</td>
+        <td style="white-space:nowrap"><button class="sm" data-edit="${f._id}">Sửa</button> <a class="btn sm amber" href="#/new-inspection/${f._id}">Kiểm tra</a> <button class="sm sec" data-del="${f._id}">Xóa</button></td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table></div>
+  <div class="pager">
+    <span>Hiển thị <b>${d.items.length}</b> / <b>${d.total}</b> cơ sở</span>
+    <div><button class="sm sec" id="prev" ${fq.page <= 1 ? 'disabled' : ''}>‹ Trang trước</button> <span style="margin:0 8px">Trang <b>${d.page}</b> / ${pages}</span> <button class="sm sec" id="next" ${fq.page >= pages ? 'disabled' : ''}>Trang sau ›</button></div>
+  </div>`;
+
+  const apply = () => { fq = { ...fq, q: $('#q').value, linhVuc: $('#lv').value, loaiHinh: $('#lh').value, trangThai: $('#tt').value, page: 1 }; facilities(); };
+  $('#go').onclick = apply;
+  $('#q').onkeydown = (e) => e.key === 'Enter' && apply();
+  $('#lv').onchange = () => { fq.linhVuc = $('#lv').value; fq.loaiHinh = ''; fq.page = 1; facilities(); };
+  $('#lh').onchange = apply;
+  $('#tt').onchange = apply;
+  $('#prev').onclick = () => { fq.page--; facilities(); };
+  $('#next').onclick = () => { fq.page++; facilities(); };
+  if ($('#add')) $('#add').onclick = () => editFacility();
   app.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => editFacility(d.items.find((x) => x._id === b.dataset.edit))));
   app.querySelectorAll('[data-del]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Xóa cơ sở này?')) { await api('/facilities/' + b.dataset.del, 'DELETE'); facilities(); } })));
 }
+
 function editFacility(f) {
-  modal(`<h3>${f ? 'Sửa' : 'Thêm'} cơ sở</h3>${facilityForm(f || {})}<p><button id="save">Lưu</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
+  modal(`<h3>${f ? '✏️ Cập nhật thông tin cơ sở' : '➕ Thêm cơ sở PCCC mới'}</h3>${facilityForm(f || {})}<p style="margin-top:16px"><button id="save">💾 Lưu thông tin</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
+  bindFacilityFormEvents('f');
   $('#save').onclick = safe(async () => {
-    await api(f ? '/facilities/' + f._id : '/facilities', f ? 'PUT' : 'POST', readForm());
+    await api(f ? '/facilities/' + f._id : '/facilities', f ? 'PUT' : 'POST', readForm('f'));
     closeModal(); facilities();
   });
 }
 
-/* ---------- Loại hình ---------- */
+/* ---------- Loại hình cơ sở (gom theo 10 lĩnh vực) ---------- */
+let tFilter = { q: '', lv: '' };
 async function types() {
-  app.innerHTML = `<h2>Loại hình cơ sở</h2><div class="bar"><button class="ok" id="add">+ Thêm loại hình</button></div>
-  <table><tr><th>Tên loại hình</th><th>Lĩnh vực</th><th>Chu kỳ kiểm tra (tháng)</th><th>Mô tả</th><th></th></tr>
-  ${TYPES.map((t) => `<tr><td>${esc(t.ten)}</td><td>${esc(t.linhVuc)}</td><td>${esc(t.chuKyKiemTraThang ?? '')}</td><td>${esc(t.moTa)}</td>
-  <td><button class="sm" data-e="${t._id}">Sửa</button> <button class="sm sec" data-d="${t._id}">Xóa</button></td></tr>`).join('')}</table>`;
+  const isAdmin = ME && ME.role === 'admin';
+  const qLow = tFilter.q.trim().toLowerCase();
+
+  const groupsHtml = LV_IDS.filter((id) => !tFilter.lv || tFilter.lv === id).map((id) => {
+    const items = TYPES.filter((t) => {
+      if (parentLvId(t.linhVuc) !== id) return false;
+      if (!qLow) return true;
+      return (t.ten || '').toLowerCase().includes(qLow) || (t.maLoaiHinh || '').toLowerCase().includes(qLow);
+    });
+    if (!items.length && qLow) return '';
+    const totalFacs = items.reduce((s, t) => s + (t.soCoSo || 0), 0);
+    return `<div class="lv-group" data-group="${id}">
+      <div class="lv-group-head">
+        <div class="lv-group-title">
+          <span class="lv-id-circle">ID: ${id}</span>
+          <div>
+            <div>Lĩnh vực ${id}: ${esc(LINH_VUC_MAP[id])}</div>
+            <small style="color:#64748b;font-weight:500">ID lĩnh vực cha: <b>${id}</b> · Gồm ${items.length} loại hình cơ sở riêng</small>
+          </div>
+        </div>
+        <div class="lv-group-meta">
+          <span class="tag gold">${items.length} loại hình</span>
+          <span class="tag ${totalFacs ? 'green' : ''}">${totalFacs} cơ sở</span>
+        </div>
+      </div>
+      <div class="lv-group-body">
+        <table>
+          <thead><tr>
+            <th style="width:90px">Mã LH</th>
+            <th>Tên loại hình cơ sở riêng</th>
+            <th style="width:150px">Thuộc lĩnh vực (ID cha)</th>
+            <th style="width:110px">Số cơ sở</th>
+            <th style="width:130px">Chu kỳ KT</th>
+            ${isAdmin ? '<th style="width:120px">Thao tác</th>' : ''}
+          </tr></thead>
+          <tbody>
+            ${items.map((t) => `<tr>
+              <td><span class="code-pill">${esc(t.maLoaiHinh || id)}</span></td>
+              <td><b>${esc(t.ten)}</b>${t.moTa ? `<br><small style="color:#64748b">${esc(t.moTa)}</small>` : ''}</td>
+              <td><span class="lv-badge"><b>ID: ${id}</b> Lĩnh vực ${id}</span></td>
+              <td>${t.soCoSo ? `<span class="tag green">${t.soCoSo} cơ sở</span>` : '<span style="color:#94a3b8">0</span>'}</td>
+              <td>${t.chuKyKiemTraThang ? `${esc(t.chuKyKiemTraThang)} tháng` : '—'}</td>
+              ${isAdmin ? `<td style="white-space:nowrap"><button class="sm" data-e="${t._id}">Sửa</button> <button class="sm sec" data-d="${t._id}">Xóa</button></td>` : ''}
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  app.innerHTML = `<div class="page-head">
+    <div>
+      <h2>🗂️ Danh mục Loại hình cơ sở PCCC (${TYPES.length} loại hình / 10 lĩnh vực)</h2>
+      <p class="sub-note">Chuẩn hóa theo 10 nhóm lĩnh vực PCCC — gom nhóm theo ID lĩnh vực cha (1–10)</p>
+    </div>
+    ${isAdmin ? '<button class="ok" id="add">+ Thêm loại hình</button>' : ''}
+  </div>
+  <div class="bar">
+    <input id="tq" placeholder="🔍 Tìm theo mã (vd 1.4, 4.22) hoặc tên loại hình..." value="${esc(tFilter.q)}" style="flex:1;min-width:240px">
+    <select id="tlv">
+      <option value="">Tất cả 10 nhóm lĩnh vực</option>
+      ${LV_IDS.map((id) => `<option value="${id}" ${tFilter.lv === id ? 'selected' : ''}>ID ${id}: ${esc(LINH_VUC_MAP[id])}</option>`).join('')}
+    </select>
+    <button id="tgo">Lọc</button>
+    <button class="sec" id="toggleAll">Thu gọn / Mở rộng tất cả</button>
+  </div>
+  <div id="lvGroups">${groupsHtml || '<div class="card">Không tìm thấy loại hình phù hợp.</div>'}</div>`;
+
+  const applyFilter = () => { tFilter = { q: $('#tq').value, lv: $('#tlv').value }; types(); };
+  $('#tgo').onclick = applyFilter;
+  $('#tq').onkeydown = (e) => e.key === 'Enter' && applyFilter();
+  $('#tlv').onchange = applyFilter;
+  $('#toggleAll').onclick = () => {
+    const groups = [...app.querySelectorAll('.lv-group')];
+    const anyOpen = groups.some((g) => !g.classList.contains('collapsed'));
+    groups.forEach((g) => g.classList.toggle('collapsed', anyOpen));
+  };
+  app.querySelectorAll('.lv-group-head').forEach((h) => {
+    h.onclick = () => h.parentElement.classList.toggle('collapsed');
+  });
+
   const form = (t) => {
-    modal(`<h3>Loại hình</h3><div class="grid"><div class="full"><label>Tên *</label><input id="t_ten" value="${esc(t?.ten)}"></div>
-    <div><label>Lĩnh vực</label><input id="t_lv" value="${esc(t?.linhVuc)}"></div><div><label>Chu kỳ kiểm tra (tháng)</label><input id="t_ck" type="number" value="${esc(t?.chuKyKiemTraThang)}"></div>
-    <div class="full"><label>Mô tả</label><textarea id="t_mt">${esc(t?.moTa)}</textarea></div></div>
+    const curLv = parentLvId(t?.linhVuc) || '1';
+    modal(`<h3>${t ? 'Sửa loại hình cơ sở' : 'Thêm loại hình cơ sở mới'}</h3>
+    <div class="grid">
+      <div><label>Thuộc lĩnh vực (ID cha 1–10) *</label>
+        <select id="t_lv">${LV_IDS.map((id) => `<option value="${id}" ${id === curLv ? 'selected' : ''}>ID ${id}: ${esc(LINH_VUC_MAP[id])}</option>`).join('')}</select>
+      </div>
+      <div><label>Mã loại hình con (vd 1.13)</label><input id="t_ma" value="${esc(t?.maLoaiHinh || '')}" placeholder="Ví dụ: 1.13"></div>
+      <div class="full"><label>Tên loại hình cơ sở *</label><input id="t_ten" value="${esc(t?.ten || '')}"></div>
+      <div><label>Chu kỳ kiểm tra (tháng)</label><input id="t_ck" type="number" value="${esc(t?.chuKyKiemTraThang ?? '')}"></div>
+      <div class="full"><label>Ghi chú / Mô tả</label><textarea id="t_mt">${esc(t?.moTa || '')}</textarea></div>
+    </div>
     <p><button id="save">Lưu</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
     $('#save').onclick = safe(async () => {
-      const b = { ten: $('#t_ten').value, linhVuc: $('#t_lv').value, chuKyKiemTraThang: $('#t_ck').value, moTa: $('#t_mt').value };
+      const b = { maLoaiHinh: $('#t_ma').value.trim(), ten: $('#t_ten').value.trim(), linhVuc: $('#t_lv').value, chuKyKiemTraThang: $('#t_ck').value, moTa: $('#t_mt').value };
       await api(t ? '/types/' + t._id : '/types', t ? 'PUT' : 'POST', b); closeModal(); route();
     });
   };
-  $('#add').onclick = () => form();
+  if ($('#add')) $('#add').onclick = () => form();
   app.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => form(TYPES.find((t) => t._id === b.dataset.e))));
-  app.querySelectorAll('[data-d]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Xóa?')) { await api('/types/' + b.dataset.d, 'DELETE'); route(); } })));
+  app.querySelectorAll('[data-d]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Xóa loại hình này?')) { await api('/types/' + b.dataset.d, 'DELETE'); route(); } })));
 }
 
 /* ---------- Kiểm tra ---------- */
@@ -258,16 +480,17 @@ const CHECKLIST = [
 async function inspections() {
   const [list, facs] = await Promise.all([api('/inspections'), api('/facilities?limit=500&trangThai=all')]);
   const name = Object.fromEntries(facs.items.map((f) => [f._id, f.ten]));
-  app.innerHTML = `<h2>Biên bản kiểm tra</h2><p>Chọn cơ sở bên trang <a href="#/facilities">Cơ sở</a> → nút <b>Kiểm tra</b> để lập biên bản mới.</p>
-  <table><tr><th>Số BB</th><th>Ngày</th><th>Cơ sở</th><th>Kết luận</th><th></th></tr>
-  ${list.map((i) => `<tr><td>${esc(i.soBienBan)}</td><td>${esc(i.ngayKiemTra)}</td><td>${esc(name[i.facilityId] || '(đã xóa)')}</td>
+  app.innerHTML = `<div class="page-head"><div><h2>📋 Biên bản kiểm tra an toàn PCCC</h2><p class="sub-note">Chọn cơ sở bên trang <a href="#/facilities">Danh sách cơ sở</a> → bấm nút <b>Kiểm tra</b> để lập biên bản mới</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Số biên bản</th><th>Ngày kiểm tra</th><th>Tên cơ sở</th><th>Kết luận</th><th>Thao tác</th></tr></thead><tbody>
+  ${list.map((i) => `<tr><td><b>${esc(i.soBienBan)}</b></td><td>${esc(i.ngayKiemTra)}</td><td>${esc(name[i.facilityId] || '(đã xóa)')}</td>
   <td><span class="tag ${i.ketLuan === 'Đạt' ? 'green' : 'red'}">${esc(i.ketLuan)}</span></td>
-  <td><a class="btn sm" href="#/inspection/${i._id}">Xem / in</a> <button class="sm sec" data-d="${i._id}">Xóa</button></td></tr>`).join('')}</table>`;
+  <td><a class="btn sm" href="#/inspection/${i._id}">🖨 Xem / In</a> <button class="sm sec" data-d="${i._id}">Xóa</button></td></tr>`).join('')}</tbody></table></div>`;
   app.querySelectorAll('[data-d]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Xóa biên bản?')) { await api('/inspections/' + b.dataset.d, 'DELETE'); inspections(); } })));
 }
 async function inspectionForm(fid) {
   const f = await api('/facilities/' + fid);
-  app.innerHTML = `<h2>Lập biên bản kiểm tra</h2><div class="card"><b style="font-size:18px">${esc(f.ten)}</b>${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))} — ${esc(f.loaiHinh)}</div><br>
+  app.innerHTML = `<div class="page-head"><div><h2>📝 Lập biên bản kiểm tra PCCC</h2></div></div>
+  <div class="card"><b style="font-size:18px">${esc(f.ten)}</b>${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))} — Lĩnh vực ID ${esc(f.linhVuc)}: ${esc(f.loaiHinh)}</div><br>
   <div class="grid"><div><label>Ngày kiểm tra</label><input type="date" id="i_ngay" value="${new Date().toISOString().slice(0, 10)}"></div>
   <div><label>Loại kiểm tra</label><select id="i_loai"><option>Định kỳ</option><option>Đột xuất</option><option>Theo dõi khắc phục</option></select></div>
   <div><label>Đoàn kiểm tra</label><input id="i_doan"></div><div><label>Người đại diện cơ sở</label><input id="i_dd" value="${esc(f.nguoiDaiDien)}"></div></div>
@@ -294,8 +517,7 @@ async function inspectionPrint(id) {
   <div class="paper"><p class="c"><b>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br>Độc lập - Tự do - Hạnh phúc</p>
   <h3>Biên bản kiểm tra an toàn về phòng cháy và chữa cháy<br><small>Số: ${esc(i.soBienBan)}</small></h3>
   <p>Hôm nay, ngày ${vnDate(i.ngayKiemTra)}, đoàn kiểm tra (${esc(i.doanKiemTra) || '...'}) đã tiến hành kiểm tra (${esc(i.loaiKiemTra)}) đối với:</p>
-  <p><b>Cơ sở:</b> ${esc(f.ten)}<br><b>Địa chỉ:</b> ${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))}<br><b>Loại hình:</b> ${esc(f.loaiHinh)} — <b>Số hồ sơ:</b> ${esc(f.soHoSo)}<br>
-  <b>Quy mô:</b> ${f.soTang ?? '...'} tầng, ${f.dienTichSan ?? '...'} m² sàn<br><b>Người đại diện:</b> ${esc(i.nguoiDaiDien)}</p>
+  <p><b>Cơ sở:</b> ${esc(f.ten)}<br><b>Địa chỉ:</b> ${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))}<br><b>Thuộc lĩnh vực:</b> ID ${esc(f.linhVuc)} (${esc(LINH_VUC_MAP[parentLvId(f.linhVuc)] || '')}) — <b>Loại hình:</b> ${esc(f.loaiHinh)}<br><b>Số hồ sơ:</b> ${esc(f.soHoSo)} — <b>Quy mô:</b> ${f.soTang ?? '...'} tầng, ${f.dienTichSan ?? '...'} m² sàn<br><b>Người đại diện:</b> ${esc(i.nguoiDaiDien)}</p>
   <table><tr><th>TT</th><th>Nội dung</th><th>Kết quả</th></tr>${(i.checklist || []).map((c, n) => `<tr><td>${n + 1}</td><td>${esc(c.noiDung)}</td><td>${esc(c.ketQua)}</td></tr>`).join('')}</table>
   <p><b>Vi phạm, tồn tại:</b><br>${esc(i.viPham || 'Không').replace(/\n/g, '<br>')}</p>
   <p><b>Kiến nghị:</b><br>${esc(i.kienNghi || 'Không').replace(/\n/g, '<br>')}<br>Hạn khắc phục: ${vnDate(i.hanKhacPhuc)}</p>
@@ -307,23 +529,24 @@ async function inspectionPrint(id) {
 let chThang = new Date().toISOString().slice(0, 7);
 async function changes() {
   const list = await api('/changes?thang=' + chThang);
-  const row = (c) => `<tr><td>${esc(c.snapshot?.ten)}</td><td>${esc([c.snapshot?.soNha, c.snapshot?.khuPho, c.snapshot?.phuong].filter(Boolean).join(', '))}</td><td>${esc(c.snapshot?.loaiHinh)}</td><td>${esc(c.lyDo)}</td><td class="noprint"><button class="sm sec" data-d="${c._id}">Hủy phiếu</button></td></tr>`;
-  const sect = (loai, title) => { const l = list.filter((c) => c.loai === loai); return `<h3>${title} (${l.length})</h3><table><tr><th>Tên cơ sở</th><th>Địa chỉ</th><th>Loại hình</th><th>Ghi chú / lý do</th><th class="noprint"></th></tr>${l.map(row).join('')}</table>`; };
-  app.innerHTML = `<h2>Danh sách tăng, giảm cơ sở tháng ${chThang.split('-').reverse().join('/')}</h2>
-  <div class="bar noprint"><input type="month" id="th" value="${chThang}"><button id="tang" class="ok">+ Tăng cơ sở</button><button id="giam">− Giảm cơ sở</button><button class="sec" onclick="print()">🖨 In</button></div>
-  ${sect('tang', 'DANH SÁCH TĂNG')}${sect('giam', 'DANH SÁCH GIẢM')}`;
+  const row = (c) => `<tr><td><b>${esc(c.snapshot?.ten)}</b></td><td>${esc([c.snapshot?.soNha, c.snapshot?.khuPho, c.snapshot?.phuong].filter(Boolean).join(', '))}</td><td>${renderLvBadge(c.snapshot?.linhVuc)}</td><td>${esc(c.snapshot?.loaiHinh)}</td><td>${esc(c.lyDo)}</td><td class="noprint"><button class="sm sec" data-d="${c._id}">Hủy phiếu</button></td></tr>`;
+  const sect = (loai, title) => { const l = list.filter((c) => c.loai === loai); return `<h3>${title} (${l.length})</h3><div class="table-wrap"><table><thead><tr><th>Tên cơ sở</th><th>Địa chỉ</th><th>Thuộc lĩnh vực</th><th>Loại hình</th><th>Ghi chú / lý do</th><th class="noprint"></th></tr></thead><tbody>${l.map(row).join('')}</tbody></table></div>`; };
+  app.innerHTML = `<div class="page-head"><div><h2>📈 Danh sách tăng, giảm cơ sở tháng ${chThang.split('-').reverse().join('/')}</h2><p class="sub-note">Theo dõi biến động cơ sở PCCC hàng tháng</p></div></div>
+  <div class="bar noprint"><input type="month" id="th" value="${chThang}"><button id="tang" class="ok">+ Tăng cơ sở</button><button id="giam">− Giảm cơ sở</button><button class="sec" onclick="print()">🖨 In danh sách</button></div>
+  ${sect('tang', 'DANH SÁCH TĂNG CƠ SỞ')}${sect('giam', 'DANH SÁCH GIẢM CƠ SỞ')}`;
   $('#th').onchange = (e) => { chThang = e.target.value; changes(); };
   app.querySelectorAll('[data-d]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Hủy phiếu và hoàn tác?')) { await api('/changes/' + b.dataset.d, 'DELETE'); changes(); } })));
-  $('#tang').onclick = () => {
-    modal(`<h3>Tăng cơ sở — tháng ${chThang}</h3>${facilityForm({}, 'n')}<p><button id="save">Lưu</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
+  if ($('#tang')) $('#tang').onclick = () => {
+    modal(`<h3>➕ Tăng cơ sở — tháng ${chThang}</h3>${facilityForm({}, 'n')}<p><button id="save">Lưu</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
+    bindFacilityFormEvents('n');
     $('#save').onclick = safe(async () => { await api('/changes', 'POST', { loai: 'tang', thang: chThang, lyDo: $('#n_ghiChu').value, facility: readForm('n') }); closeModal(); changes(); });
   };
-  $('#giam').onclick = () => {
-    modal(`<h3>Giảm cơ sở — tháng ${chThang}</h3><div class="bar"><input id="gq" placeholder="Tìm cơ sở..."><button id="gs">Tìm</button></div><div id="gres"></div>
+  if ($('#giam')) $('#giam').onclick = () => {
+    modal(`<h3>➖ Giảm cơ sở — tháng ${chThang}</h3><div class="bar"><input id="gq" placeholder="Tìm cơ sở..."><button id="gs">Tìm</button></div><div id="gres"></div>
     <div><label>Lý do giảm</label><input id="gly" placeholder="Ngưng hoạt động, chuyển địa điểm, ..."></div>`);
     $('#gs').onclick = safe(async () => {
       const d = await api('/facilities?limit=15&q=' + encodeURIComponent($('#gq').value));
-      $('#gres').innerHTML = `<table>${d.items.map((f) => `<tr><td>${esc(f.ten)}<br><small>${esc([f.soNha, f.phuong].filter(Boolean).join(', '))}</small></td><td><button class="sm" data-g="${f._id}">Giảm</button></td></tr>`).join('')}</table>`;
+      $('#gres').innerHTML = `<div class="table-wrap"><table>${d.items.map((f) => `<tr><td><b>${esc(f.ten)}</b><br><small>${esc([f.soNha, f.phuong].filter(Boolean).join(', '))}</small></td><td>${renderLvBadge(f.linhVuc)}</td><td><button class="sm" data-g="${f._id}">Chọn giảm</button></td></tr>`).join('')}</table></div>`;
       $('#gres').querySelectorAll('[data-g]').forEach((b) => (b.onclick = safe(async () => {
         await api('/changes', 'POST', { loai: 'giam', thang: chThang, lyDo: $('#gly').value, facilityId: b.dataset.g }); closeModal(); changes();
       })));

@@ -300,7 +300,17 @@ async function main() {
   }
   if (dry) { console.log(`\n[DRY RUN] ${types.size} loại hình sẽ được tạo. Không ghi vào DB.`); return process.exit(0); }
   for (const t of types.values()) {
-    await db.collection('types').updateOne({ ten: t.ten, linhVuc: t.linhVuc, moTa: t.moTa }, { $setOnInsert: t }, { upsert: true });
+    const { ALL_TYPES, normalizeFacilityType } = require('../lib/catalog');
+    await db.collection('types').deleteMany({});
+    await db.collection('types').insertMany(ALL_TYPES.map((item) => ({ ...item, createdAt: new Date() })));
+    const allFacs = await facs.find({}).toArray();
+    if (allFacs.length) {
+      await facs.bulkWrite(allFacs.map((f) => {
+        const std = normalizeFacilityType(f);
+        return { updateOne: { filter: { _id: f._id }, update: { $set: { maLoaiHinh: std.maLoaiHinh, loaiHinh: std.loaiHinh, linhVuc: std.linhVuc, tenLinhVuc: std.tenLinhVuc } } } };
+      }));
+    }
+    break;
   }
   await facs.createIndex({ soTaiKhoan: 1 });
   await facs.createIndex({ ten: 1 });

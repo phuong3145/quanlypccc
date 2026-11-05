@@ -1,0 +1,202 @@
+{
+  "danh_muc_loai_hinh_co_so_pccc": [
+    {
+      "id": 1,
+      "nhom_linh_vuc": "Nhà ở, Trụ sở & Bưu chính",
+      "cac_loai_hinh_co_so_rieng": [
+        { "id": "1.1", "ten": "Nhà chung cư (chỉ để ở)" },
+        { "id": "1.2", "ten": "Nhà tập thể" },
+        { "id": "1.3", "ten": "Nhà ở hộ gia đình (nhà ở riêng lẻ)" },
+        { "id": "1.4", "ten": "Nhà ở kết hợp sản xuất, kinh doanh" },
+        { "id": "1.5", "ten": "Trụ sở làm việc của cơ quan nhà nước cấp trung ương" },
+        { "id": "1.6", "ten": "Trụ sở làm việc của cơ quan nhà nước cấp tỉnh" },
+        { "id": "1.7", "ten": "Trụ sở làm việc của cơ quan nhà nước cấp xã" },
+        { "id": "1.8", "ten": "Trụ sở, nhà làm việc của doanh nghiệp, tổ chức chính trị, xã hội" },
+        { "id": "1.9", "ten": "Nhà đa năng, nhà hỗn hợp" },
+        { "id": "1.10", "ten": "Bưu điện" },
+        { "id": "1.11", "ten": "Bưu cục" },
+        { "id": "1.12", "ten": "Cơ sở cung cấp dịch vụ bưu chính, viễn thông khác" }
+      ]
+    },
+    {
+      "id": 2,
+      "nhom_linh_vuc": "Y tế & Trợ giúp xã hội",
+      "cac_loai_hinh_co_so_rieng": [
+        { "id": "2.1", "ten": "Bệnh viện công lập" },
+        { "id": "2.2", "ten": "Bệnh viện tư nhân" },
+        { "id": "2.3", "ten": "Phòng khám (đa khoa, chuyên khoa)" },
+        { "id": "2.4", "ten": "Trạm y tế" },
+        { "id": "2.5", "ten": "Nhà hộ sinh" },
+        { "id": "2.6", "ten": "Cơ sở phòng chống dịch bệnh" },
+        { "id": "2.7", "ten": "Cơ sở nghiên cứu, thí nghiệm chuyên ngành y tế" },
+        { "id": "2.8", "ten": "Nhà điều dưỡng, phục hồi chức năng, chỉnh hình, dưỡng lão" },
+        { "id": "2.9", "ten": "Cơ sở dịch vụ cận lâm sàng" },
+        { "id": "2.10", "ten": "Cơ sở cấp cứu ngoại viện" },
+        { "id": "2.11", "ten": "Cơ sở khám chữa bệnh y học gia đình" },
+        { "id": "2.12", "ten": "Cơ sở giám định y khoa, giám định pháp y, pháp y tâm thần" },
+        { "id": "2.13", "ten": "Cơ sở trợ giúp xã hội" }
+      ]
+    },
+    {
+      "id": 3,
+      "nhom_linh_vuc": "Giáo dục & Nghiên cứu",
+      "cac_loai_hinh_co_so_rieng": [
+        { "id": "3.1", "ten": "Nhà trẻ" },
+        { "id": "3.2", "ten": "Trường mẫu giáo, mầm non công lập" },
+        { "id": "3.3", "ten": "Trường mẫu giáo, mầm non tư thục (dân lập)" },
+        { "id": "3.4", "ten": "Trường tiểu học công lập" },
+        { "id": "3.5", "ten": "Trường tiểu học tư thục (dân lập)" },
+        { "id": "3.6", "ten": "Trường trung học cơ sở công lập" },
+        { "id": "3.7", "ten": "Trường trung học cơ sở tư thục (dân lập)" },
+        { "id": "3.8", "ten": "Trường trung học phổ thông công lập" },
+        { "id": "3.9", "ten": "Trường trung học phổ thông tư thục (dân lập)" },
+        { "id": "3.10", "ten": "Trường phổ thông có nhiều cấp học" },
+        { "id": "3.11", "ten": "Học viện" },
+        { "id": "3.12", "ten": "Trường đại học" },
+        { "id": "3.13", "ten": "Trường cao đẳng" },
+        { "id": "3.14", "ten": "Trường trung cấp chuyên nghiệp" },
+        { "id": "3.15", "ten": "Trường dạy nghề" },
+        { "id": "3.16", "ten": "Cơ sở giáo dục thường xuyên" },
+        { "id": "3.17", "ten": "Cơ sở nghiên cứu vũ trụ, trung tâm dữ liệu và nghiên cứu chuyên ngành" }
+      ]
+    },
+    {
+      "id": 4,
+      "nhom_linh_vuc": "Văn hóa, Thể thao, Giải trí & Lưu trú",
+      "cac_loai_hinh_co_so_rieng": [
+        { "id": "4.1", "ten": "Sân vận động" },
+        { "id": "4.2", "ten": "Nhà thi đấu, nhà tập luyện thể thao, bể bơi, sân thi đấu có khán đài" },
+        { "id": "4.3", "ten": "Trường đua, trường bắn" },
+        { "id": "4.4", "ten": "Nhà hát" },
+        { "id": "4.5", "ten": "Rạp chiếu phim" },
+        { "id": "4.6", "ten": "Rạp xiếc" },
+        { "id": "4.7", "ten": "Trung tâm hội nghị" },
+        { "id": "4.8", "ten": "Bảo tàng" },
+        { "id": "4.9", "ten": "Thư viện" },
+        { "id": "4.10", "ten": "Nhà trưng bày, nhà triển lãm" },
+        { "id": "4.11", "ten": "Nhà văn hóa" },
+        { "id": "4.12", "ten": "Thủy cung" },
+        { "id": "4.13", "ten": "Cơ sở kinh doanh dịch vụ karaoke" },
+        { "id": "4.14", "ten": "Cơ sở kinh doanh dịch vụ vũ trường" },
+        { "id": "4.15", "ten": "Cơ sở kinh doanh dịch vụ vui chơi, giải trí" },
+        { "id": "4.16", "ten": "Cơ sở tôn giáo" },
+        { "id": "4.17", "ten": "Cơ sở tín ngưỡng" },
+        { "id": "4.18", "ten": "Công trình di tích lịch sử - văn hóa" },
+        { "id": "4.19", "ten": "Khách sạn" },
+        { "id": "4.20", "ten": "Nhà khách" },
+        { "id": "4.21", "ten": "Nhà nghỉ" },
+        { "id": "4.22", "ten": "Cơ sở nghỉ dưỡng, nhà trọ, cơ sở lưu trú khác" }
+      ]
+    },
+    {
+      "id": 5,
+      "nhom_linh_vuc": "Thương mại & Dịch vụ",
+      "cac_loai_hinh_co_so_rieng": [
+        { "id": "5.1", "ten": "Chợ hạng 1" },
+        { "id": "5.2", "ten": "Chợ hạng 2" },
+        { "id": "5.3", "ten": "Chợ hạng 3" },
+        { "id": "5.4", "ten": "Trung tâm thương mại (độc lập)" },
+        { "id": "5.5", "ten": "Siêu thị (độc lập)" },
+        { "id": "5.6", "ten": "Nhà hàng, cơ sở kinh doanh dịch vụ ăn uống" },
+        { "id": "5.7", "ten": "Cơ sở tắm hơi, massage, spa, thẩm mỹ viện" },
+        { "id": "5.8", "ten": "Cơ sở dịch vụ giặt là, đóng gói" },
+        { "id": "5.9", "ten": "Cửa hàng, cơ sở kinh doanh hàng hóa dễ cháy" },
+        { "id": "5.10", "ten": "Cơ sở kinh doanh hàng hóa khó cháy / không cháy trong bao bì dễ cháy" }
+      ]
+    },
+    {
+      "id": 6,
+      "nhom_linh_vuc": "Giao thông, Hạ tầng & Bãi xe",
+      "cac_loai_hinh_co_so_rieng": [
+        { "id": "6.1", "ten": "Nhà để xe ô tô" },
+        { "id": "6.2", "ten": "Nhà để xe máy" },
+        { "id": "6.3", "ten": "Nhà trưng bày ô tô" },
+        { "id": "6.4", "ten": "Nhà trưng bày xe máy" },
+        { "id": "6.5", "ten": "Nhà ga hành khách cảng hàng không" },
+        { "id": "6.6", "ten": "Nhà khách phục vụ ngoại giao cảng hàng không" },
+        { "id": "6.7", "ten": "Nhà ga hàng hóa cảng hàng không" },
+        { "id": "6.8", "ten": "Nhà kỹ thuật máy bay" },
+        { "id": "6.9", "ten": "Đài kiểm soát không lưu" },
+        { "id": "6.10", "ten": "Cảng thủy nội địa, bến thủy nội địa" },
+        { "id": "6.11", "ten": "Bến cảng biển" },
+        { "id": "6.12", "ten": "Cảng cá" },
+        { "id": "6.13", "ten": "Cảng cạn" },
+        { "id": "6.14", "ten": "Bến xe khách" },
+        { "id": "6.15", "ten": "Trung tâm đăng kiểm phương tiện giao thông" },
+        { "id": "6.16", "ten": "Trạm dừng nghỉ" },
+        { "id": "6.17", "ten": "Hầm đường ô tô (chiều dài từ 500m trở lên)" },
+        { "id": "6.18", "ten": "Nhà ga hành khách, nhà ga hàng hóa, đề-pô (depot) đường sắt" },
+        { "id": "6.19", "ten": "Nhà ga cáp treo" },
+        { "id": "6.20", "ten": "Hầm đường sắt (chiều dài từ 500m trở lên)" },
+        { "id": "6.21", "ten": "Hầm, nhà ga hành khách, đề-pô đường sắt đô thị" },
+        { "id": "6.22", "ten": "Cơ sở sửa chữa, bảo dưỡng phương tiện giao thông cơ giới đường bộ" },
+        { "id": "6.23", "ten": "Cơ sở sửa chữa phương tiện thủy nội địa, tàu biển" }
+      ]
+    },
+    {
+      "id": 7,
+      "nhom_linh_vuc": "Năng lượng & Điện lực",
+      "cac_loai_hinh_co_so_rieng": [
+        { "id": "7.1", "ten": "Nhà máy thủy điện" },
+        { "id": "7.2", "ten": "Nhà máy nhiệt điện" },
+        { "id": "7.3", "ten": "Nhà máy điện hạt nhân" },
+        { "id": "7.4", "ten": "Nhà máy điện gió" },
+        { "id": "7.5", "ten": "Nhà máy điện mặt trời" },
+        { "id": "7.6", "ten": "Nhà máy điện rác" },
+        { "id": "7.7", "ten": "Trạm biến áp 110kV" },
+        { "id": "7.8", "ten": "Trạm biến áp 220kV" },
+        { "id": "7.9", "ten": "Trạm biến áp 500kV" }
+      ]
+    },
+    {
+      "id": 8,
+      "nhom_linh_vuc": "Dầu khí, Xăng dầu & Khí đốt",
+      "cac_loai_hinh_co_so_rieng": [
+        { "id": "8.1", "ten": "Nhà máy lọc dầu" },
+        { "id": "8.2", "ten": "Nhà máy hóa dầu" },
+        { "id": "8.3", "ten": "Nhà máy lọc hóa dầu" },
+        { "id": "8.4", "ten": "Nhà máy chế biến khí" },
+        { "id": "8.5", "ten": "Nhà máy sản xuất nhiên liệu sinh học" },
+        { "id": "8.6", "ten": "Kho dầu mỏ và sản phẩm dầu mỏ" },
+        { "id": "8.7", "ten": "Kho khí đốt LNG" },
+        { "id": "8.8", "ten": "Kho khí đốt LPG" },
+        { "id": "8.9", "ten": "Kho khí đốt CNG" },
+        { "id": "8.10", "ten": "Trạm phân phối khí đốt" },
+        { "id": "8.11", "ten": "Trạm chiết, nạp khí hóa lỏng" },
+        { "id": "8.12", "ten": "Cửa hàng xăng dầu trên mặt đất" },
+        { "id": "8.13", "ten": "Cửa hàng xăng dầu trên mặt nước" },
+        { "id": "8.14", "ten": "Cửa hàng kinh doanh khí đốt (gas)" }
+      ]
+    },
+    {
+      "id": 9,
+      "nhom_linh_vuc": "Hóa chất, Vật liệu nổ & Công nghiệp nguy hiểm",
+      "cac_loai_hinh_co_so_rieng": [
+        { "id": "9.1", "ten": "Cơ sở sản xuất vật liệu nổ, tiền chất thuốc nổ, vũ khí, công cụ hỗ trợ" },
+        { "id": "9.2", "ten": "Kho cố định chứa vật liệu nổ, tiền chất thuốc nổ, vũ khí, công cụ hỗ trợ" },
+        { "id": "9.3", "ten": "Cơ sở hạt nhân (trừ nhà máy điện hạt nhân)" },
+        { "id": "9.4", "ten": "Cơ sở sản xuất, kho chứa, kinh doanh phân bón, hóa chất bảo vệ thực vật, hóa dược, mỹ phẩm" },
+        { "id": "9.5", "ten": "Cơ sở sản xuất, kho chứa, kinh doanh nguồn điện hóa học (pin, ắc quy...)" },
+        { "id": "9.6", "ten": "Cơ sở sản xuất, kho chứa, kinh doanh khí công nghiệp" },
+        { "id": "9.7", "ten": "Cơ sở sản xuất, kho chứa, kinh doanh sản phẩm cao su" },
+        { "id": "9.8", "ten": "Cơ sở sản xuất, kho chứa, kinh doanh chất tẩy rửa" },
+        { "id": "9.9", "ten": "Cơ sở sản xuất, kho chứa, kinh doanh sơn, mực in" },
+        { "id": "9.10", "ten": "Cơ sở sản xuất, kho chứa, kinh doanh nguyên liệu nhựa" },
+        { "id": "9.11", "ten": "Cơ sở kinh doanh chất lỏng dễ cháy" }
+      ]
+    },
+    {
+      "id": 10,
+      "nhom_linh_vuc": "Sản xuất Công nghiệp & Kho hàng",
+      "cac_loai_hinh_co_so_rieng": [
+        { "id": "10.1", "ten": "Cơ sở sản xuất vật liệu, sản phẩm xây dựng" },
+        { "id": "10.2", "ten": "Cơ sở luyện kim và cơ khí chế tạo" },
+        { "id": "10.3", "ten": "Cơ sở khai thác và chế biến khoáng sản" },
+        { "id": "10.4", "ten": "Cơ sở công nghiệp nhẹ (xưởng in, dệt may, cơ khí nhẹ...)" },
+        { "id": "10.5", "ten": "Kho dự trữ quốc gia" },
+        { "id": "10.6", "ten": "Kho chứa hàng hóa nguy hiểm cháy, nổ (hạng A, B, C, D, E)" },
+        { "id": "10.7", "ten": "Bãi chứa hàng hóa, vật tư, phế liệu cháy được" }
+      ]
+    }
+  ]
+}
