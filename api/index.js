@@ -30,7 +30,7 @@ const FAC_FIELDS = [
   'thamDuyet', 'tinhTrangViPham', 'donViQuanLy', 'ghiChu', 'nguoiDaiDien', 'dienThoai',
   'soTangHam', 'dienTichMatBang', 'nhomLoaiHinh', 'canBoUsername',
 ];
-const { GROUPS, LINH_VUC_MAP, STANDARD_WARDS, WARD_NAMES, normalizeWard, normalizeFacilityType } = require('../lib/catalog');
+const { GROUPS, LINH_VUC_MAP, STANDARD_WARDS, WARD_NAMES, normalizeWard, normalizeMonthYear, normalizeFacilityType } = require('../lib/catalog');
 const { getCache, setCache, clearCache } = require('../lib/cache');
 const num = (o, ks) => ks.forEach((k) => { if (o[k] !== undefined && o[k] !== '') o[k] = Number(o[k]); });
 
@@ -46,6 +46,12 @@ app.use('/api', (req, res, next) => {
 
 function applyLinhVucFromType(d) {
   d.phuong = normalizeWard(d.phuong);
+  if (d.thangNamHoatDong !== undefined) {
+    d.thangNamHoatDong = normalizeMonthYear(d.thangNamHoatDong);
+    if (d.thangNamHoatDong && !/^(0[1-9]|1[0-2])\/\d{4}$/.test(d.thangNamHoatDong)) {
+      throw new Error('Tháng/năm hoạt động phải đúng định dạng MM/YYYY (ví dụ: 03/2020)');
+    }
+  }
   if (d.loaiHinh) {
     const std = normalizeFacilityType(d);
     if (std) {

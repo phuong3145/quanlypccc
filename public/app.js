@@ -122,7 +122,7 @@ const FIELDS = [
   ['soNha', 'Số nhà, tên đường'],
   ['khuPho', 'Khu phố / KCN'],
   ['phuong', 'Phường / xã *', 'ward'],
-  ['thangNamHoatDong', 'Tháng/năm hoạt động (vd 03/2020)'],
+  ['thangNamHoatDong', 'Tháng/năm hoạt động (MM/YYYY)', 'mmyyyy'],
   ['soTang', 'Số tầng (nổi)', 'number'],
   ['soTangHam', 'Số tầng hầm', 'number'],
   ['dienTichMatBang', 'Diện tích mặt bằng (m²)', 'number'],
@@ -169,12 +169,16 @@ function facilityForm(f = {}, prefix = 'f') {
 
   const curOwner = f.canBoUsername || ME?.username || '';
   const ownerSelectHtml = hasPerm('assignFacilityOwner')
-    ? `<div class="full"><label for="${prefix}_canBoUsername">👤 Tài khoản Cán bộ phụ trách cơ sở *</label>
+    ? `<div class="full"><label for="${prefix}_canBoUsername">👤 Cán bộ phụ trách cơ sở *</label>
         <select id="${prefix}_canBoUsername">
-          ${OFFICERS.map((u) => `<option value="${esc(u.username)}" ${u.username === curOwner ? 'selected' : ''}>${esc(u.hoTen)} (${esc(u.username)} — ${esc(ROLE_NAME[u.role] || u.role)})</option>`).join('')}
+          ${OFFICERS.map((u) => `<option value="${esc(u.username)}" ${u.username === curOwner ? 'selected' : ''}>${esc(u.hoTen)} — ${esc(ROLE_NAME[u.role] || u.role)}</option>`).join('')}
         </select>
       </div>`
     : '';
+
+  const curYear = new Date().getFullYear();
+  const yearsList = Array.from({ length: curYear - 1979 + 5 }, (_, i) => String(curYear + 4 - i));
+  const monthsList = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
 
   return `<div class="grid">` +
     ownerSelectHtml +
@@ -188,6 +192,13 @@ function facilityForm(f = {}, prefix = 'f') {
       } else if (kind === 'ward') {
         const curWard = WARD_NAMES.includes(f[k]) ? f[k] : WARD_NAMES[0];
         input = `<select id="${id}">${WARD_NAMES.map((w) => `<option value="${esc(w)}" ${w === curWard ? 'selected' : ''}>${esc(w)}</option>`).join('')}</select>`;
+      } else if (kind === 'mmyyyy') {
+        const [initM = '', initY = ''] = String(f[k] || '').split('/');
+        input = `<div style="display:flex;gap:6px;align-items:center">
+          <input id="${id}" type="text" value="${v}" autocomplete="off" placeholder="MM/YYYY (vd: 03/2020)" maxlength="7" style="flex:1;min-width:120px">
+          <select id="${id}_m" style="width:92px" title="Chọn tháng"><option value="">Tháng</option>${monthsList.map((m) => `<option value="${m}" ${m === initM ? 'selected' : ''}>T${m}</option>`).join('')}</select>
+          <select id="${id}_y" style="width:92px" title="Chọn năm"><option value="">Năm</option>${yearsList.map((y) => `<option value="${y}" ${y === initY ? 'selected' : ''}>${y}</option>`).join('')}</select>
+        </div>`;
       } else if (kind === 'select') {
         const list = f[k] && !opts.includes(f[k]) ? [...opts, f[k]] : opts;
         input = `<select id="${id}">${list.map((o) => `<option ${o === f[k] ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
@@ -207,10 +218,45 @@ function bindFacilityFormEvents(prefix = 'f') {
       if (opt && opt.dataset.lv) lvSel.value = opt.dataset.lv;
     };
   }
+  const mmInput = $(`#${prefix}_thangNamHoatDong`);
+  const mmSel = $(`#${prefix}_thangNamHoatDong_m`);
+  const yySel = $(`#${prefix}_thangNamHoatDong_y`);
+  if (mmInput && mmSel && yySel) {
+    const syncFromSelects = () => {
+      if (mmSel.value && yySel.value) mmInput.value = `${mmSel.value}/${yySel.value}`;
+      else if (yySel.value && !mmSel.value) { mmSel.value = '01'; mmInput.value = `01/${yySel.value}`; }
+    };
+    mmSel.onchange = syncFromSelects;
+    yySel.onchange = syncFromSelects;
+    mmInput.oninput = () => {
+      let digits = mmInput.value.replace(/\D/g, '');
+      if (digits.length >= 3 && !mmInput.value.includes('/')) {
+        mmInput.value = digits.slice(0, 2) + '/' + digits.slice(2, 6);
+      }
+      const m = mmInput.value.match(/^(\d{1,2})\/(\d{4})$/);
+      if (m) {
+        const mm = String(Math.min(12, Math.max(1, +m[1]))).padStart(2, '0');
+        mmSel.value = mm;
+        yySel.value = m[2];
+      }
+    };
+  }
 }
+
+const formatMmYyyy = (raw) => {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const m = s.match(/^(\d{1,2})\s*[\/.\-]\s*(\d{4})$/);
+  if (m) {
+    const mm = parseInt(m[1], 10);
+    if (mm >= 1 && mm <= 12) return `${String(mm).padStart(2, '0')}/${m[2]}`;
+  }
+  throw new Error('Tháng/năm hoạt động phải đúng định dạng MM/YYYY (ví dụ: 03/2020)');
+};
 
 const readForm = (prefix = 'f') => {
   const obj = Object.fromEntries(FIELDS.map(([k]) => [k, $(`#${prefix}_${k}`).value.trim()]));
+  obj.thangNamHoatDong = formatMmYyyy(obj.thangNamHoatDong);
   const opt = $(`#${prefix}_loaiHinh`)?.selectedOptions?.[0];
   if (opt?.dataset?.lv) obj.linhVuc = opt.dataset.lv; // Đảm bảo luôn lưu ID của phần cha (1..10)
   const ownerEl = $(`#${prefix}_canBoUsername`);
@@ -301,7 +347,7 @@ function start() {
   $('#authView').classList.add('hidden');
   $('#shell').classList.remove('hidden');
   document.querySelectorAll('.adminOnly').forEach((e) => e.classList.toggle('hidden', !hasPerm('manageSystem')));
-  $('#me').innerHTML = `<b>👤 ${esc(ME.hoTen)}</b><small>${esc(ROLE_NAME[ME.role] || ME.role)} (${esc(ME.username)})</small>
+  $('#me').innerHTML = `<b>👤 ${esc(ME.hoTen)}</b><small>${esc(ROLE_NAME[ME.role] || ME.role)}</small>
     <button class="sm sec" id="chpw">Đổi MK</button><button class="sm sec" id="logout">Đăng xuất</button>`;
   $('#logout').onclick = async () => { await api('/auth/logout', 'POST').catch(() => {}); ME = null; boot(); };
   $('#chpw').onclick = () => {
@@ -474,9 +520,10 @@ async function dashboard() {
     return `<div class="bars">${arr.map((x) => `<div><span class="lbl" title="${esc(labelFn(x))}">${esc(labelFn(x))}</span><div class="track"><i style="width:${x.n ? Math.max(4, (x.n / m) * 100) : 0}%"></i></div><b class="val">${x.n}</b></div>`).join('')}</div>`;
   };
   const fieldItems = [...(s.byField || [])].sort((a, b) => Number(a._id || 99) - Number(b._id || 99));
+  const selectedOfficerName = OFFICERS.find((u) => u.username === dashCanBo)?.hoTen || dashCanBo;
   const scopeNote = canViewAll
-    ? (dashCanBo ? `Đang lọc theo cán bộ: ${dashCanBo}` : 'Toàn bộ cơ sở trên hệ thống (Tất cả cán bộ)')
-    : `Cơ sở do cán bộ ${ME.hoTen} (${ME.username}) phụ trách`;
+    ? (dashCanBo ? `Đang lọc theo cán bộ: ${selectedOfficerName}` : 'Toàn bộ cơ sở trên hệ thống (Tất cả cán bộ)')
+    : `Cơ sở do cán bộ ${ME.hoTen} phụ trách`;
 
   app.innerHTML = `<div class="page-head">
     <div>
@@ -486,7 +533,7 @@ async function dashboard() {
     ${canViewAll ? `<div>
       <select id="dash_cb" style="min-width:240px">
         <option value="">👥 Tất cả cán bộ phụ trách</option>
-        ${OFFICERS.map((u) => `<option value="${esc(u.username)}" ${dashCanBo === u.username ? 'selected' : ''}>👤 ${esc(u.hoTen)} (${esc(u.username)})</option>`).join('')}
+        ${OFFICERS.map((u) => `<option value="${esc(u.username)}" ${dashCanBo === u.username ? 'selected' : ''}>👤 ${esc(u.hoTen)}</option>`).join('')}
       </select>
     </div>` : ''}
   </div>
@@ -500,7 +547,7 @@ async function dashboard() {
     <div class="card"><h4>Phân bố theo 10 Lĩnh vực PCCC</h4>${bars(fieldItems, (x) => `Lĩnh vực ${x._id}: ${LINH_VUC_MAP[x._id] || 'Khác'}`)}</div>
     <div class="card gold"><h4>Top 10 Loại hình cơ sở</h4>${bars(s.byType)}</div>
     <div class="card slate"><h4>Phân bố theo Phường / Xã</h4>${bars(s.byWard)}</div>
-    ${canViewAll ? `<div class="card green"><h4>Phân bố theo Cán bộ phụ trách</h4>${bars(s.byOfficer, (x) => `${x.hoTen || x._id || 'Chưa gán'} (${x._id || '—'})`)}</div>` : ''}
+    ${canViewAll ? `<div class="card green"><h4>Phân bố theo Cán bộ phụ trách</h4>${bars(s.byOfficer, (x) => x.hoTen || OFFICERS.find((u) => u.username === x._id)?.hoTen || 'Chưa gán')}</div>` : ''}
   </div>`;
   if ($('#dash_cb')) {
     $('#dash_cb').onchange = (e) => { dashCanBo = e.target.value; dashboard(); };
@@ -522,7 +569,7 @@ async function facilities() {
   app.innerHTML = `<div class="page-head">
     <div>
       <h2>🏢 Danh sách cơ sở PCCC (${d.total})</h2>
-      <p class="sub-note">${canViewAll ? 'Xem toàn bộ cơ sở của các cán bộ trên địa bàn' : `Danh sách cơ sở thuộc quyền quản lý của cán bộ <b>${esc(ME.hoTen)} (${esc(ME.username)})</b>`}</p>
+      <p class="sub-note">${canViewAll ? 'Xem toàn bộ cơ sở của các cán bộ trên địa bàn' : `Danh sách cơ sở thuộc quyền quản lý của cán bộ <b>${esc(ME.hoTen)}</b>`}</p>
     </div>
     ${canManage ? '<button class="ok" id="add">+ Thêm cơ sở mới</button>' : ''}
   </div>
@@ -534,7 +581,7 @@ async function facilities() {
     </select>
     ${canViewAll ? `<select id="cb">
       <option value="">👥 Tất cả cán bộ phụ trách</option>
-      ${OFFICERS.map((u) => `<option value="${esc(u.username)}" ${fq.canBo === u.username ? 'selected' : ''}>👤 ${esc(u.hoTen)} (${esc(u.username)})</option>`).join('')}
+      ${OFFICERS.map((u) => `<option value="${esc(u.username)}" ${fq.canBo === u.username ? 'selected' : ''}>👤 ${esc(u.hoTen)}</option>`).join('')}
     </select>` : ''}
     <select id="lv">
       <option value="">Tất cả lĩnh vực (1–10)</option>
@@ -619,7 +666,7 @@ function viewFacility(f) {
     ['Số hồ sơ', f.soHoSo],
     ['Số tài khoản', f.soTaiKhoan],
     ['Trạng thái hoạt động', f.trangThai === 'giam' ? `Đã giảm (${f.thangGiam || ''} - ${f.lyDoGiam || ''})` : 'Đang hoạt động'],
-    ['Cán bộ phụ trách', `${f.canBoHoTen || f.canBoUsername || '—'} ${f.canBoUsername ? `(${f.canBoUsername})` : ''}`],
+    ['Cán bộ phụ trách', f.canBoHoTen || OFFICERS.find((u) => u.username === f.canBoUsername)?.hoTen || '—'],
     ['Thuộc lĩnh vực PCCC', lvId ? `Lĩnh vực ${lvId} — ${lvName}` : '—', true],
     ['Loại hình cơ sở', f.loaiHinh, true],
     ['Số nhà, tên đường', f.soNha],
