@@ -96,6 +96,13 @@ function modal(html) { $('#modalBox').innerHTML = html; $('#modal').classList.re
 function closeModal() { $('#modal').classList.add('hidden'); }
 $('#modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal') closeModal(); });
 
+const WARD_NAMES = [
+  'Phường Tân Thuận',
+  'Phường Phú Thuận',
+  'Phường Tân Mỹ',
+  'Phường Tân Hưng',
+];
+
 const FIELDS = [
   ['ten', 'Tên cơ sở *', 'full'],
   ['soHoSo', 'Số hồ sơ'],
@@ -104,7 +111,7 @@ const FIELDS = [
   ['linhVuc', 'Thuộc lĩnh vực (ID cha 1–10)', 'linhvuc'],
   ['soNha', 'Số nhà, tên đường'],
   ['khuPho', 'Khu phố / KCN'],
-  ['phuong', 'Phường / xã'],
+  ['phuong', 'Phường / xã *', 'ward'],
   ['thangNamHoatDong', 'Tháng/năm hoạt động (vd 03/2020)'],
   ['soTang', 'Số tầng (nổi)', 'number'],
   ['soTangHam', 'Số tầng hầm', 'number'],
@@ -168,6 +175,9 @@ function facilityForm(f = {}, prefix = 'f') {
         input = `<select id="${id}"><option value="">-- Chọn loại hình cơ sở --</option>${extraOpt}${groupedOptions}</select>`;
       } else if (kind === 'linhvuc') {
         input = `<select id="${id}">${LV_IDS.map((lid) => `<option value="${lid}" ${lid === curLv ? 'selected' : ''}>Lĩnh vực ${lid} — ${esc(LINH_VUC_MAP[lid])}</option>`).join('')}</select>`;
+      } else if (kind === 'ward') {
+        const curWard = WARD_NAMES.includes(f[k]) ? f[k] : WARD_NAMES[0];
+        input = `<select id="${id}">${WARD_NAMES.map((w) => `<option value="${esc(w)}" ${w === curWard ? 'selected' : ''}>${esc(w)}</option>`).join('')}</select>`;
       } else if (kind === 'select') {
         const list = f[k] && !opts.includes(f[k]) ? [...opts, f[k]] : opts;
         input = `<select id="${id}">${list.map((o) => `<option ${o === f[k] ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
@@ -199,7 +209,7 @@ const readForm = (prefix = 'f') => {
 };
 
 /* ---------- Router ---------- */
-const routes = { '': dashboard, facilities, types, inspections, changes, users, logs, 'inspection': inspectionPrint, 'new-inspection': inspectionForm };
+const routes = { '': dashboard, facilities, wards, types, inspections, changes, users, logs, 'inspection': inspectionPrint, 'new-inspection': inspectionForm };
 const ADMIN_ROUTES = ['users', 'logs'];
 async function route() {
   if (!ME) return;
@@ -450,7 +460,7 @@ async function dashboard() {
   const bars = (arr, labelFn = (x) => x._id || '(trống)') => {
     if (!arr || !arr.length) return '<p style="color:#94a3b8;font-size:13px">Chưa có dữ liệu</p>';
     const m = Math.max(1, ...arr.map((x) => x.n));
-    return `<div class="bars">${arr.map((x) => `<div><span class="lbl" title="${esc(labelFn(x))}">${esc(labelFn(x))}</span><div class="track"><i style="width:${Math.max(4, (x.n / m) * 100)}%"></i></div><b class="val">${x.n}</b></div>`).join('')}</div>`;
+    return `<div class="bars">${arr.map((x) => `<div><span class="lbl" title="${esc(labelFn(x))}">${esc(labelFn(x))}</span><div class="track"><i style="width:${x.n ? Math.max(4, (x.n / m) * 100) : 0}%"></i></div><b class="val">${x.n}</b></div>`).join('')}</div>`;
   };
   const fieldItems = [...(s.byField || [])].sort((a, b) => Number(a._id || 99) - Number(b._id || 99));
   const scopeNote = canViewAll
@@ -507,6 +517,10 @@ async function facilities() {
   </div>
   <div class="bar">
     <input id="q" placeholder="🔍 Tìm tên cơ sở, số hồ sơ, mã tài khoản, địa chỉ..." value="${esc(fq.q)}">
+    <select id="ph">
+      <option value="">📍 Tất cả 4 phường</option>
+      ${WARD_NAMES.map((w) => `<option value="${esc(w)}" ${fq.phuong === w ? 'selected' : ''}>${esc(w)}</option>`).join('')}
+    </select>
     ${canViewAll ? `<select id="cb">
       <option value="">👥 Tất cả cán bộ phụ trách</option>
       ${OFFICERS.map((u) => `<option value="${esc(u.username)}" ${fq.canBo === u.username ? 'selected' : ''}>👤 ${esc(u.hoTen)} (${esc(u.username)})</option>`).join('')}
@@ -564,6 +578,7 @@ async function facilities() {
     fq = {
       ...fq,
       q: $('#q').value,
+      phuong: $('#ph').value,
       canBo: $('#cb') ? $('#cb').value : '',
       linhVuc: $('#lv').value,
       loaiHinh: $('#lh').value,
@@ -574,6 +589,7 @@ async function facilities() {
   };
   $('#go').onclick = apply;
   $('#q').onkeydown = (e) => e.key === 'Enter' && apply();
+  $('#ph').onchange = apply;
   if ($('#cb')) $('#cb').onchange = apply;
   $('#lv').onchange = () => { fq.linhVuc = $('#lv').value; fq.loaiHinh = ''; fq.page = 1; facilities(); };
   $('#lh').onchange = apply;
@@ -634,6 +650,74 @@ function editFacility(f) {
   $('#save').onclick = safe(async () => {
     await api(f ? '/facilities/' + f._id : '/facilities', f ? 'PUT' : 'POST', readForm('f'));
     closeModal(); facilities();
+  });
+}
+
+/* ---------- Địa bàn 4 Phường ---------- */
+async function wards() {
+  const list = await api('/wards');
+  const totalActive = list.reduce((s, w) => s + (w.soCoSo || 0), 0);
+  const colors = ['', 'gold', 'green', 'slate'];
+
+  app.innerHTML = `<div class="page-head">
+    <div>
+      <h2>📍 Quản lý Địa bàn Phường (4 Phường)</h2>
+      <p class="sub-note">Chuẩn hóa địa bàn 4 phường: Phường Tân Thuận, Phường Phú Thuận, Phường Tân Mỹ, Phường Tân Hưng</p>
+    </div>
+  </div>
+  <div class="cards">
+    ${list.map((w, i) => `<div class="card ${colors[i % colors.length]}">
+      <b>${w.soCoSo || 0}</b>
+      <div style="font-weight:700;font-size:15px;color:var(--slate-900);margin-bottom:4px">📍 ${esc(w.ten)}</div>
+      <small style="color:#64748b;display:block;margin-bottom:10px">${w.soGiam ? `Đã giảm: ${w.soGiam} cơ sở` : 'Đang hoạt động ổn định'}</small>
+      <button class="sm info" data-go-ward="${esc(w.ten)}">Xem danh sách cơ sở →</button>
+    </div>`).join('')}
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th style="width:60px">STT</th>
+      <th>Tên Phường</th>
+      <th>Số cơ sở đang hoạt động</th>
+      <th>Số cơ sở đã giảm</th>
+      <th>Tỷ lệ phân bố</th>
+      <th>Phân bố theo Lĩnh vực PCCC</th>
+      <th>Thao tác</th>
+    </tr></thead>
+    <tbody>
+      ${list.map((w, idx) => {
+        const pct = totalActive ? ((w.soCoSo / totalActive) * 100).toFixed(1) : '0.0';
+        const fieldBadges = (w.byField || []).map((f) => `<span class="tag gold" title="${esc(LINH_VUC_MAP[f.linhVuc] || '')}">Lĩnh vực ${esc(f.linhVuc)}: <b>${f.count}</b></span>`).join(' ');
+        return `<tr>
+          <td style="font-weight:700;color:#64748b">${idx + 1}</td>
+          <td><b style="font-size:15px;color:var(--red-800)">📍 ${esc(w.ten)}</b><br><small style="color:#64748b">${esc(w.moTa || '')}</small></td>
+          <td><span class="tag ${w.soCoSo ? 'green' : ''}">${w.soCoSo || 0} cơ sở</span></td>
+          <td><span class="tag ${w.soGiam ? 'red' : ''}">${w.soGiam || 0}</span></td>
+          <td><b>${pct}%</b></td>
+          <td><div class="perm-pills">${fieldBadges || '<span style="color:#94a3b8">Chưa có cơ sở</span>'}</div></td>
+          <td style="white-space:nowrap">
+            <button class="sm info" data-go-ward="${esc(w.ten)}">🔍 Lọc cơ sở</button>
+            ${hasPerm('manageFacilities') ? `<button class="sm ok" data-add-ward="${esc(w.ten)}">+ Thêm CS tại đây</button>` : ''}
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table></div>`;
+
+  app.querySelectorAll('[data-go-ward]').forEach((b) => {
+    b.onclick = () => {
+      fq = { ...fq, phuong: b.dataset.goWard, page: 1 };
+      location.hash = '#/facilities';
+    };
+  });
+  app.querySelectorAll('[data-add-ward]').forEach((b) => {
+    b.onclick = () => {
+      modal(`<h3>➕ Thêm cơ sở PCCC tại ${esc(b.dataset.addWard)}</h3>${facilityForm({ phuong: b.dataset.addWard }, 'f')}<p style="margin-top:16px"><button id="save">💾 Lưu thông tin</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
+      bindFacilityFormEvents('f');
+      $('#save').onclick = safe(async () => {
+        await api('/facilities', 'POST', readForm('f'));
+        closeModal(); wards();
+      });
+    };
   });
 }
 

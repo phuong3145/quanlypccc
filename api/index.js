@@ -30,7 +30,7 @@ const FAC_FIELDS = [
   'thamDuyet', 'tinhTrangViPham', 'donViQuanLy', 'ghiChu', 'nguoiDaiDien', 'dienThoai',
   'soTangHam', 'dienTichMatBang', 'nhomLoaiHinh', 'canBoUsername',
 ];
-const { GROUPS, LINH_VUC_MAP, normalizeWard, normalizeFacilityType } = require('../lib/catalog');
+const { GROUPS, LINH_VUC_MAP, STANDARD_WARDS, WARD_NAMES, normalizeWard, normalizeFacilityType } = require('../lib/catalog');
 const { getCache, setCache, clearCache } = require('../lib/cache');
 const num = (o, ks) => ks.forEach((k) => { if (o[k] !== undefined && o[k] !== '') o[k] = Number(o[k]); });
 
@@ -45,7 +45,7 @@ app.use('/api', (req, res, next) => {
 });
 
 function applyLinhVucFromType(d) {
-  if (d.phuong !== undefined) d.phuong = normalizeWard(d.phuong);
+  d.phuong = normalizeWard(d.phuong);
   if (d.loaiHinh) {
     const std = normalizeFacilityType(d);
     if (std) {
@@ -88,10 +88,55 @@ async function resolveOwnerFields(db, req, d, isCreate = false) {
   }
 }
 
-/* ---------- Danh mục chuẩn & Loại hình ---------- */
+/* ---------- Danh mục chuẩn, Phường & Loại hình ---------- */
 app.get('/api/catalog', (req, res) => {
-  res.json({ groups: GROUPS, linhVucMap: LINH_VUC_MAP });
+  res.json({ groups: GROUPS, linhVucMap: LINH_VUC_MAP, wards: STANDARD_WARDS });
 });
+
+app.get('/api/wards', wrap(async (req, res) => {
+  const scope = userScope(req);
+  const cacheKey = `wards:${scope}`;
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    res.setHeader('X-Cache', `HIT-${cached.source}`);
+    return res.json(cached.val);
+  }
+  const db = await getDb();
+  let wards = await db.collection('wards').find().sort({ thuTu: 1 }).toArray();
+  if (!wards.length) {
+    await db.collection('wards').insertMany(STANDARD_WARDS.map((w) => ({ ...w, createdAt: new Date() })));
+    wards = await db.collection('wards').find().sort({ thuTu: 1 }).toArray();
+  }
+  const ownerMatch = req.user.perms.viewAllFacilities ? {} : { canBoUsername: req.user.username };
+  const [activeCounts, giamCounts, fieldCounts] = await Promise.all([
+    db.collection('facilities').aggregate([
+      { $match: { trangThai: 'hoatdong', ...ownerMatch } },
+      { $group: { _id: '$phuong', count: { $sum: 1 } } },
+    ]).toArray(),
+    db.collection('facilities').aggregate([
+      { $match: { trangThai: 'giam', ...ownerMatch } },
+      { $group: { _id: '$phuong', count: { $sum: 1 } } },
+    ]).toArray(),
+    db.collection('facilities').aggregate([
+      { $match: { trangThai: 'hoatdong', ...ownerMatch } },
+      { $group: { _id: { phuong: '$phuong', linhVuc: '$linhVuc' }, count: { $sum: 1 } } },
+    ]).toArray(),
+  ]);
+  const actMap = Object.fromEntries(activeCounts.map((c) => [c._id, c.count]));
+  const giamMap = Object.fromEntries(giamCounts.map((c) => [c._id, c.count]));
+  const result = wards.map((w) => ({
+    ...w,
+    soCoSo: actMap[w.ten] || 0,
+    soGiam: giamMap[w.ten] || 0,
+    byField: fieldCounts
+      .filter((fc) => fc._id.phuong === w.ten)
+      .map((fc) => ({ linhVuc: fc._id.linhVuc, count: fc.count }))
+      .sort((a, b) => Number(a.linhVuc) - Number(b.linhVuc)),
+  }));
+  await setCache(cacheKey, result, 300);
+  res.setHeader('X-Cache', 'MISS');
+  res.json(result);
+}));
 
 app.get('/api/types', wrap(async (req, res) => {
   const scope = userScope(req);
@@ -403,16 +448,18 @@ app.get('/api/stats', wrap(async (req, res) => {
     act.canBoUsername = canBoFilter;
     ownerFilter.canBoUsername = canBoFilter;
   }
-  const [total, byType, byWard, byField, byOfficer, tang, giam, inspections] = await Promise.all([
+  const [total, byType, rawByWard, byField, byOfficer, tang, giam, inspections] = await Promise.all([
     facs.countDocuments(act),
     facs.aggregate([{ $match: act }, { $group: { _id: '$loaiHinh', n: { $sum: 1 } } }, { $sort: { n: -1 } }, { $limit: 10 }]).toArray(),
-    facs.aggregate([{ $match: act }, { $group: { _id: '$phuong', n: { $sum: 1 } } }, { $sort: { n: -1 } }]).toArray(),
+    facs.aggregate([{ $match: act }, { $group: { _id: '$phuong', n: { $sum: 1 } } }]).toArray(),
     facs.aggregate([{ $match: act }, { $group: { _id: '$linhVuc', n: { $sum: 1 } } }, { $sort: { n: -1 } }]).toArray(),
     facs.aggregate([{ $match: act }, { $group: { _id: '$canBoUsername', hoTen: { $first: '$canBoHoTen' }, n: { $sum: 1 } } }, { $sort: { n: -1 } }]).toArray(),
     db.collection('changes').countDocuments({ loai: 'tang', ...ownerFilter }),
     db.collection('changes').countDocuments({ loai: 'giam', ...ownerFilter }),
     db.collection('inspections').countDocuments(ownerFilter),
   ]);
+  const wardCountMap = Object.fromEntries(rawByWard.map((w) => [normalizeWard(w._id), w.n]));
+  const byWard = WARD_NAMES.map((ten) => ({ _id: ten, n: wardCountMap[ten] || 0 }));
   const result = { total, byType, byWard, byField, byOfficer, tang, giam, inspections };
   await setCache(cacheKey, result, 300);
   res.setHeader('X-Cache', 'MISS');
