@@ -475,7 +475,7 @@ async function dashboard() {
     <div class="card green"><b>${s.tang} / ${s.giam}</b>Lượt Tăng / Giảm cơ sở</div>
     <div class="card slate"><b>${s.inspections}</b>Biên bản kiểm tra đã lập</div>
   </div>
-  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
+  <div class="cards charts-grid">
     <div class="card"><h4>Phân bố theo 10 Lĩnh vực PCCC</h4>${bars(fieldItems, (x) => `Lĩnh vực ${x._id}: ${LINH_VUC_MAP[x._id] || 'Khác'}`)}</div>
     <div class="card gold"><h4>Top 10 Loại hình cơ sở</h4>${bars(s.byType)}</div>
     <div class="card slate"><h4>Phân bố theo Phường / Xã</h4>${bars(s.byWard)}</div>
