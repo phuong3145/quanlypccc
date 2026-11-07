@@ -17,7 +17,72 @@ const LINH_VUC_MAP = {
 const LV_IDS = Object.keys(LINH_VUC_MAP);
 const parentLvId = (v) => String(v ?? '').split('.')[0].replace(/\D/g, '') || '';
 
+const ROLE_NAME = {
+  admin: 'Quản trị viên',
+  banchihuy: 'Ban chỉ huy',
+  canbo: 'Cán bộ',
+  xem: 'Chỉ xem',
+};
+const ROLE_TAG = {
+  admin: 'red',
+  banchihuy: 'gold',
+  canbo: 'blue',
+  xem: '',
+};
+
+const PERM_SCHEMA = [
+  ['viewAllFacilities', 'Xem cơ sở của tất cả cán bộ', 'Tắt: chỉ xem được cơ sở thuộc tài khoản của mình'],
+  ['manageFacilities', 'Thêm / Sửa / Xóa cơ sở PCCC', 'Cho phép nhập mới, cập nhật và xóa hồ sơ cơ sở'],
+  ['assignFacilityOwner', 'Chuyển / Gán cán bộ quản lý cơ sở', 'Cho phép chọn cơ sở thuộc về tài khoản cán bộ nào'],
+  ['manageTypes', 'Quản lý Danh mục Loại hình cơ sở', 'Thêm, sửa, xóa loại hình trong 10 lĩnh vực PCCC'],
+  ['manageInspections', 'Quản lý Biên bản kiểm tra', 'Lập mới, sửa và xóa biên bản kiểm tra an toàn PCCC'],
+  ['manageChanges', 'Quản lý Tăng / Giảm cơ sở', 'Thêm, sửa và xóa/hủy phiếu tăng giảm cơ sở'],
+  ['manageSystem', 'Quản trị hệ thống (Tài khoản & Nhật ký)', 'Truy cập mục Quản lý tài khoản, Phân quyền & Nhật ký'],
+];
+
+const ROLE_DEFAULTS = {
+  admin: {
+    viewAllFacilities: true,
+    manageFacilities: true,
+    assignFacilityOwner: true,
+    manageTypes: true,
+    manageInspections: true,
+    manageChanges: true,
+    manageSystem: true,
+  },
+  banchihuy: {
+    viewAllFacilities: true,
+    manageFacilities: true,
+    assignFacilityOwner: true,
+    manageTypes: true,
+    manageInspections: true,
+    manageChanges: true,
+    manageSystem: false,
+  },
+  canbo: {
+    viewAllFacilities: false,
+    manageFacilities: true,
+    assignFacilityOwner: false,
+    manageTypes: false,
+    manageInspections: true,
+    manageChanges: true,
+    manageSystem: false,
+  },
+  xem: {
+    viewAllFacilities: false,
+    manageFacilities: false,
+    assignFacilityOwner: false,
+    manageTypes: false,
+    manageInspections: false,
+    manageChanges: false,
+    manageSystem: false,
+  },
+};
+
 let ME = null;
+let OFFICERS = [];
+const hasPerm = (k) => !!(ME?.permissions ? ME.permissions[k] : ROLE_DEFAULTS[ME?.role || 'canbo']?.[k]);
+
 async function api(path, method = 'GET', body) {
   const r = await fetch('/api' + path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
   const data = await r.json().catch(() => ({}));
@@ -58,6 +123,13 @@ const FIELDS = [
 
 let TYPES = [];
 const loadTypes = async () => (TYPES = await api('/types'));
+const loadOfficers = async () => {
+  if (hasPerm('viewAllFacilities') || hasPerm('assignFacilityOwner')) {
+    OFFICERS = await api('/officers').catch(() => []);
+  } else if (ME) {
+    OFFICERS = [{ username: ME.username, hoTen: ME.hoTen, role: ME.role }];
+  }
+};
 
 function renderLvBadge(lv) {
   const pid = parentLvId(lv);
@@ -78,7 +150,17 @@ function facilityForm(f = {}, prefix = 'f') {
   const extraOpt = f.loaiHinh && !TYPES.some((t) => t.ten === f.loaiHinh)
     ? `<option value="${esc(f.loaiHinh)}" selected>${esc(f.loaiHinh)}</option>` : '';
 
+  const curOwner = f.canBoUsername || ME?.username || '';
+  const ownerSelectHtml = hasPerm('assignFacilityOwner')
+    ? `<div class="full"><label for="${prefix}_canBoUsername">👤 Tài khoản Cán bộ phụ trách cơ sở *</label>
+        <select id="${prefix}_canBoUsername">
+          ${OFFICERS.map((u) => `<option value="${esc(u.username)}" ${u.username === curOwner ? 'selected' : ''}>${esc(u.hoTen)} (${esc(u.username)} — ${esc(ROLE_NAME[u.role] || u.role)})</option>`).join('')}
+        </select>
+      </div>`
+    : '';
+
   return `<div class="grid">` +
+    ownerSelectHtml +
     FIELDS.map(([k, label, kind, opts]) => {
       const id = `${prefix}_${k}`, v = esc(f[k] ?? '');
       let input;
@@ -111,6 +193,8 @@ const readForm = (prefix = 'f') => {
   const obj = Object.fromEntries(FIELDS.map(([k]) => [k, $(`#${prefix}_${k}`).value.trim()]));
   const opt = $(`#${prefix}_loaiHinh`)?.selectedOptions?.[0];
   if (opt?.dataset?.lv) obj.linhVuc = opt.dataset.lv; // Đảm bảo luôn lưu ID của phần cha (1..10)
+  const ownerEl = $(`#${prefix}_canBoUsername`);
+  if (ownerEl) obj.canBoUsername = ownerEl.value;
   return obj;
 };
 
@@ -123,19 +207,14 @@ async function route() {
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === `#/${name}`));
   app.innerHTML = 'Đang tải dữ liệu...';
   try {
-    if (ADMIN_ROUTES.includes(name) && ME.role !== 'admin') throw new Error('Chỉ quản trị viên được truy cập');
-    await loadTypes(); await (routes[name] || dashboard)(arg);
+    if (ADMIN_ROUTES.includes(name) && !hasPerm('manageSystem')) throw new Error('Tài khoản không có quyền truy cập Quản trị hệ thống');
+    await Promise.all([loadTypes(), loadOfficers()]);
+    await (routes[name] || dashboard)(arg);
   } catch (e) { app.innerHTML = `<p style="color:#b91c1c">Lỗi: ${esc(e.message)}</p>`; }
 }
 window.addEventListener('hashchange', route);
 
 /* ---------- Đăng nhập / khởi động ---------- */
-const ROLE_NAME = { admin: 'Quản trị viên', canbo: 'Cán bộ', xem: 'Chỉ xem' };
-new MutationObserver(() => {
-  if (!ME || ME.role !== 'xem') return;
-  app.querySelectorAll('#add,#tang,#giam,[data-edit],[data-del],[data-d],[data-e],a[href^="#/new-inspection"]').forEach((e) => e.remove());
-}).observe(app, { childList: true, subtree: true });
-
 const EYE_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
 const EYE_OFF_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
 
@@ -200,8 +279,8 @@ function authScreen(setup) {
 function start() {
   $('#authView').classList.add('hidden');
   $('#shell').classList.remove('hidden');
-  document.querySelectorAll('.adminOnly').forEach((e) => e.classList.toggle('hidden', ME.role !== 'admin'));
-  $('#me').innerHTML = `<b>👤 ${esc(ME.hoTen)}</b><small>${ROLE_NAME[ME.role]}</small>
+  document.querySelectorAll('.adminOnly').forEach((e) => e.classList.toggle('hidden', !hasPerm('manageSystem')));
+  $('#me').innerHTML = `<b>👤 ${esc(ME.hoTen)}</b><small>${esc(ROLE_NAME[ME.role] || ME.role)} (${esc(ME.username)})</small>
     <button class="sm sec" id="chpw">Đổi MK</button><button class="sm sec" id="logout">Đăng xuất</button>`;
   $('#logout').onclick = async () => { await api('/auth/logout', 'POST').catch(() => {}); ME = null; boot(); };
   $('#chpw').onclick = () => {
@@ -219,28 +298,129 @@ async function boot() {
 }
 boot();
 
-/* ---------- Quản trị: tài khoản ---------- */
+/* ---------- Quản trị: Tài khoản & Phân quyền ---------- */
+const PERM_SHORT = {
+  viewAllFacilities: 'Xem tất cả CS',
+  manageFacilities: 'Thêm/Sửa/Xóa CS',
+  assignFacilityOwner: 'Gán cán bộ',
+  manageTypes: 'Sửa loại hình',
+  manageInspections: 'Biên bản KT',
+  manageChanges: 'Tăng/Giảm CS',
+  manageSystem: 'Quản trị HT',
+};
+
+function renderPermSummary(u) {
+  const p = u.permissions || ROLE_DEFAULTS[u.role] || {};
+  const badges = Object.entries(PERM_SHORT)
+    .filter(([k]) => p[k])
+    .map(([k, lbl]) => `<span class="tag ${k === 'manageSystem' ? 'red' : k === 'viewAllFacilities' ? 'gold' : 'green'}">${esc(lbl)}</span>`);
+  if (!badges.length) return '<span class="tag">Chỉ xem CS cá nhân</span>';
+  return `<div class="perm-pills">${badges.join('')}</div>`;
+}
+
 async function users() {
   const list = await api('/admin/users');
-  app.innerHTML = `<div class="page-head"><div><h2>👥 Quản lý tài khoản</h2><p class="sub-note">Cấp phát và phân quyền truy cập hệ thống</p></div><button class="ok" id="add">+ Cấp tài khoản</button></div>
-  <div class="table-wrap"><table><thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th>Đăng nhập cuối</th><th>Thao tác</th></tr></thead><tbody>
-  ${list.map((u) => `<tr><td><b>${esc(u.username)}</b></td><td>${esc(u.hoTen)}</td><td><span class="tag blue">${ROLE_NAME[u.role]}</span></td>
-  <td><span class="tag ${u.active ? 'green' : 'red'}">${u.active ? 'Hoạt động' : 'Đã khóa'}</span></td><td>${u.lastLogin ? new Date(u.lastLogin).toLocaleString('vi-VN') : '—'}</td>
-  <td style="white-space:nowrap"><button class="sm" data-e="${u._id}">Sửa / đặt lại MK</button> <button class="sm sec" data-t="${u._id}">${u.active ? 'Khóa' : 'Mở khóa'}</button>
-  <button class="sm sec" data-o="${u._id}">Buộc đăng xuất</button> <button class="sm sec" data-x="${u._id}">Xóa</button></td></tr>`).join('')}</tbody></table></div>`;
+  app.innerHTML = `<div class="page-head">
+    <div>
+      <h2>👥 Quản lý tài khoản &amp; Phân quyền</h2>
+      <p class="sub-note">Cấp phát tài khoản Quản trị viên, Ban chỉ huy, Cán bộ và tùy chỉnh quyền hạn từng chức năng</p>
+    </div>
+    <button class="ok" id="add">+ Cấp tài khoản mới</button>
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Tên đăng nhập</th>
+      <th>Họ và tên</th>
+      <th>Vai trò</th>
+      <th>Số cơ sở phụ trách</th>
+      <th>Phân quyền chức năng</th>
+      <th>Trạng thái</th>
+      <th>Đăng nhập cuối</th>
+      <th>Thao tác</th>
+    </tr></thead>
+    <tbody>
+    ${list.map((u) => `<tr>
+      <td><b>${esc(u.username)}</b></td>
+      <td>${esc(u.hoTen)}</td>
+      <td><span class="tag ${ROLE_TAG[u.role] || 'blue'}">${esc(ROLE_NAME[u.role] || u.role)}</span></td>
+      <td><span class="tag ${u.soCoSo ? 'green' : ''}">${u.soCoSo || 0} cơ sở</span></td>
+      <td>${renderPermSummary(u)}</td>
+      <td><span class="tag ${u.active ? 'green' : 'red'}">${u.active ? 'Hoạt động' : 'Đã khóa'}</span></td>
+      <td>${u.lastLogin ? new Date(u.lastLogin).toLocaleString('vi-VN') : '—'}</td>
+      <td style="white-space:nowrap">
+        <button class="sm" data-e="${u._id}">🔐 Phân quyền / Sửa</button>
+        <button class="sm sec" data-t="${u._id}">${u.active ? 'Khóa' : 'Mở khóa'}</button>
+        <button class="sm sec" data-o="${u._id}">Buộc xuất</button>
+        <button class="sm sec" data-x="${u._id}">Xóa</button>
+      </td>
+    </tr>`).join('')}
+    </tbody>
+  </table></div>`;
+
   const form = (u) => {
-    modal(`<h3>${u ? 'Sửa tài khoản ' + esc(u.username) : 'Cấp tài khoản mới'}</h3><div class="grid">
-    ${u ? '' : '<div><label>Tên đăng nhập *</label><input id="u_name"></div>'}
-    <div><label>Họ tên</label><input id="u_ht" value="${esc(u?.hoTen)}"></div>
-    <div><label>Vai trò</label><select id="u_role">${Object.entries(ROLE_NAME).map(([k, v]) => `<option value="${k}" ${u?.role === k || (!u && k === 'canbo') ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-    <div><label>${u ? 'Mật khẩu mới (để trống nếu không đổi)' : 'Mật khẩu * (≥ 6 ký tự)'}</label><input id="u_pw" type="text" autocomplete="off"></div></div>
-    <p><small>Quản trị viên: toàn quyền · Cán bộ: nhập liệu, lập biên bản, tăng/giảm · Chỉ xem: chỉ xem dữ liệu.</small></p>
-    <p><button id="save">Lưu</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
+    const initRole = u?.role || 'canbo';
+    const initPerms = { ...(ROLE_DEFAULTS[initRole] || ROLE_DEFAULTS.canbo), ...(u?.permissions || {}) };
+    modal(`<h3>${u ? `🔐 Phân quyền &amp; Sửa tài khoản: ${esc(u.username)}` : '➕ Cấp tài khoản mới &amp; Phân quyền'}</h3>
+    <div class="grid">
+      ${u ? '' : '<div><label>Tên đăng nhập *</label><input id="u_name" placeholder="vd: tuannghia"></div>'}
+      <div><label>Họ và tên *</label><input id="u_ht" value="${esc(u?.hoTen || '')}" placeholder="Nhập họ tên cán bộ..."></div>
+      <div>
+        <label>Vai trò (Chọn để áp dụng mẫu quyền mặc định)</label>
+        <select id="u_role">
+          ${Object.entries(ROLE_NAME).map(([k, v]) => `<option value="${k}" ${initRole === k ? 'selected' : ''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      <div class="${u ? 'full' : ''}">
+        <label>${u ? 'Mật khẩu mới (để trống nếu giữ nguyên)' : 'Mật khẩu * (tối thiểu 6 ký tự)'}</label>
+        <input id="u_pw" type="text" autocomplete="off" placeholder="${u ? 'Nhập mật khẩu mới nếu muốn đổi...' : 'Nhập mật khẩu ≥ 6 ký tự...'}">
+      </div>
+      <div class="full">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <label style="margin:0;font-size:13px;color:var(--red-800)">⚙️ Phân quyền chức năng chi tiết (Có thể bật/tắt tùy ý cho từng tài khoản)</label>
+          <button type="button" class="sm sec" id="u_reset_perm">Đặt lại theo mẫu vai trò</button>
+        </div>
+        <div class="perm-box">
+          <div class="perm-grid">
+            ${PERM_SCHEMA.map(([k, title, desc]) => `
+              <label class="perm-item">
+                <input type="checkbox" data-perm="${k}" ${initPerms[k] ? 'checked' : ''}>
+                <div>
+                  <b>${esc(title)}</b>
+                  <small>${esc(desc)}</small>
+                </div>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:16px"><button id="save">💾 Lưu tài khoản &amp; Phân quyền</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
+
+    const applyRolePreset = (role) => {
+      const preset = ROLE_DEFAULTS[role] || ROLE_DEFAULTS.canbo;
+      document.querySelectorAll('#modalBox [data-perm]').forEach((cb) => {
+        cb.checked = !!preset[cb.dataset.perm];
+      });
+    };
+    $('#u_role').onchange = (e) => applyRolePreset(e.target.value);
+    $('#u_reset_perm').onclick = () => applyRolePreset($('#u_role').value);
+
     $('#save').onclick = safe(async () => {
-      const b = { hoTen: $('#u_ht').value, role: $('#u_role').value };
+      const permissions = {};
+      document.querySelectorAll('#modalBox [data-perm]').forEach((cb) => {
+        permissions[cb.dataset.perm] = cb.checked;
+      });
+      const b = { hoTen: $('#u_ht').value.trim(), role: $('#u_role').value, permissions };
       if ($('#u_pw').value) b.password = $('#u_pw').value;
-      if (u) await api('/admin/users/' + u._id, 'PUT', b);
-      else await api('/admin/users', 'POST', { ...b, username: $('#u_name').value, password: $('#u_pw').value });
+      if (u) {
+        await api('/admin/users/' + u._id, 'PUT', b);
+        if (String(u._id) === String(ME._id)) {
+          const st = await api('/auth/status');
+          if (st.user) ME = st.user;
+        }
+      } else {
+        await api('/admin/users', 'POST', { ...b, username: $('#u_name').value, password: $('#u_pw').value });
+      }
       closeModal(); users();
     });
   };
@@ -262,41 +442,75 @@ async function logs() {
 }
 
 /* ---------- Tổng quan ---------- */
+let dashCanBo = '';
 async function dashboard() {
-  const s = await api('/stats');
+  const canViewAll = hasPerm('viewAllFacilities');
+  const qs = canViewAll && dashCanBo ? `?canBo=${encodeURIComponent(dashCanBo)}` : '';
+  const s = await api('/stats' + qs);
   const bars = (arr, labelFn = (x) => x._id || '(trống)') => {
+    if (!arr || !arr.length) return '<p style="color:#94a3b8;font-size:13px">Chưa có dữ liệu</p>';
     const m = Math.max(1, ...arr.map((x) => x.n));
     return `<div class="bars">${arr.map((x) => `<div><span class="lbl" title="${esc(labelFn(x))}">${esc(labelFn(x))}</span><div class="track"><i style="width:${Math.max(4, (x.n / m) * 100)}%"></i></div><b class="val">${x.n}</b></div>`).join('')}</div>`;
   };
   const fieldItems = [...(s.byField || [])].sort((a, b) => Number(a._id || 99) - Number(b._id || 99));
-  app.innerHTML = `<div class="page-head"><div><h2>📊 Tổng quan công tác quản lý PCCC</h2><p class="sub-note">Thống kê số liệu cơ sở theo 10 lĩnh vực và địa bàn quản lý</p></div></div>
+  const scopeNote = canViewAll
+    ? (dashCanBo ? `Đang lọc theo cán bộ: ${dashCanBo}` : 'Toàn bộ cơ sở trên hệ thống (Tất cả cán bộ)')
+    : `Cơ sở do cán bộ ${ME.hoTen} (${ME.username}) phụ trách`;
+
+  app.innerHTML = `<div class="page-head">
+    <div>
+      <h2>📊 Tổng quan công tác quản lý PCCC</h2>
+      <p class="sub-note">Phạm vi dữ liệu: <b>${esc(scopeNote)}</b></p>
+    </div>
+    ${canViewAll ? `<div>
+      <select id="dash_cb" style="min-width:240px">
+        <option value="">👥 Tất cả cán bộ phụ trách</option>
+        ${OFFICERS.map((u) => `<option value="${esc(u.username)}" ${dashCanBo === u.username ? 'selected' : ''}>👤 ${esc(u.hoTen)} (${esc(u.username)})</option>`).join('')}
+      </select>
+    </div>` : ''}
+  </div>
   <div class="cards">
     <div class="card"><b>${s.total}</b>Cơ sở đang quản lý</div>
     <div class="card gold"><b>${LV_IDS.length}</b>Nhóm lĩnh vực PCCC (${TYPES.length} loại hình)</div>
     <div class="card green"><b>${s.tang} / ${s.giam}</b>Lượt Tăng / Giảm cơ sở</div>
     <div class="card slate"><b>${s.inspections}</b>Biên bản kiểm tra đã lập</div>
   </div>
-  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr))">
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
     <div class="card"><h4>Phân bố theo 10 Lĩnh vực PCCC</h4>${bars(fieldItems, (x) => `Lĩnh vực ${x._id}: ${LINH_VUC_MAP[x._id] || 'Khác'}`)}</div>
     <div class="card gold"><h4>Top 10 Loại hình cơ sở</h4>${bars(s.byType)}</div>
     <div class="card slate"><h4>Phân bố theo Phường / Xã</h4>${bars(s.byWard)}</div>
+    ${canViewAll ? `<div class="card green"><h4>Phân bố theo Cán bộ phụ trách</h4>${bars(s.byOfficer, (x) => `${x.hoTen || x._id || 'Chưa gán'} (${x._id || '—'})`)}</div>` : ''}
   </div>`;
+  if ($('#dash_cb')) {
+    $('#dash_cb').onchange = (e) => { dashCanBo = e.target.value; dashboard(); };
+  }
 }
 
 /* ---------- Cơ sở ---------- */
-let fq = { q: '', linhVuc: '', loaiHinh: '', phuong: '', trangThai: 'hoatdong', page: 1 };
+let fq = { q: '', linhVuc: '', loaiHinh: '', phuong: '', trangThai: 'hoatdong', canBo: '', page: 1 };
 async function facilities() {
+  const canViewAll = hasPerm('viewAllFacilities');
+  const canManage = hasPerm('manageFacilities');
+  const canInspect = hasPerm('manageInspections');
   const qs = new URLSearchParams({ ...fq, limit: 20 });
+  if (!canViewAll) qs.delete('canBo');
   const d = await api('/facilities?' + qs);
   const pages = Math.max(1, Math.ceil(d.total / d.limit));
   const filteredTypes = fq.linhVuc ? TYPES.filter((t) => parentLvId(t.linhVuc) === fq.linhVuc) : TYPES;
 
   app.innerHTML = `<div class="page-head">
-    <div><h2>🏢 Danh sách cơ sở PCCC (${d.total})</h2><p class="sub-note">Quản lý hồ sơ, phân loại theo 10 lĩnh vực PCCC và kiểm tra định kỳ</p></div>
-    <button class="ok" id="add">+ Thêm cơ sở mới</button>
+    <div>
+      <h2>🏢 Danh sách cơ sở PCCC (${d.total})</h2>
+      <p class="sub-note">${canViewAll ? 'Xem toàn bộ cơ sở của các cán bộ trên địa bàn' : `Danh sách cơ sở thuộc quyền quản lý của cán bộ <b>${esc(ME.hoTen)} (${esc(ME.username)})</b>`}</p>
+    </div>
+    ${canManage ? '<button class="ok" id="add">+ Thêm cơ sở mới</button>' : ''}
   </div>
   <div class="bar">
     <input id="q" placeholder="🔍 Tìm tên cơ sở, số hồ sơ, mã tài khoản, địa chỉ..." value="${esc(fq.q)}">
+    ${canViewAll ? `<select id="cb">
+      <option value="">👥 Tất cả cán bộ phụ trách</option>
+      ${OFFICERS.map((u) => `<option value="${esc(u.username)}" ${fq.canBo === u.username ? 'selected' : ''}>👤 ${esc(u.hoTen)} (${esc(u.username)})</option>`).join('')}
+    </select>` : ''}
     <select id="lv">
       <option value="">Tất cả lĩnh vực (1–10)</option>
       ${LV_IDS.map((id) => `<option value="${id}" ${fq.linhVuc === id ? 'selected' : ''}>Lĩnh vực ${id}: ${esc(LINH_VUC_MAP[id])}</option>`).join('')}
@@ -319,6 +533,7 @@ async function facilities() {
       <th>Thuộc lĩnh vực</th>
       <th>Loại hình cơ sở</th>
       <th>Quy mô</th>
+      <th>Cán bộ phụ trách</th>
       <th>Kiểm tra cuối</th>
       <th>Thao tác</th>
     </tr></thead>
@@ -329,8 +544,13 @@ async function facilities() {
         <td>${renderLvBadge(f.linhVuc)}</td>
         <td>${esc(f.loaiHinh || '—')}</td>
         <td style="white-space:nowrap">${f.soTang ? `${f.soTang} tầng` : ''}${f.soTangHam ? ` (${f.soTangHam} hầm)` : ''}<br><small style="color:#64748b">${f.dienTichSan ? `${f.dienTichSan} m² sàn` : (f.dienTichMatBang ? `${f.dienTichMatBang} m² MB` : '')}</small></td>
+        <td><span class="tag blue">👤 ${esc(f.canBoHoTen || f.canBoUsername || '—')}</span></td>
         <td>${esc(f.lanKiemTraCuoi || '—')}</td>
-        <td style="white-space:nowrap"><button class="sm" data-edit="${f._id}">Sửa</button> <a class="btn sm amber" href="#/new-inspection/${f._id}">Kiểm tra</a> <button class="sm sec" data-del="${f._id}">Xóa</button></td>
+        <td style="white-space:nowrap">
+          ${canManage ? `<button class="sm" data-edit="${f._id}">Sửa</button>` : ''}
+          ${canInspect ? `<a class="btn sm amber" href="#/new-inspection/${f._id}">Kiểm tra</a>` : ''}
+          ${canManage ? `<button class="sm sec" data-del="${f._id}">Xóa</button>` : ''}
+        </td>
       </tr>`).join('')}
     </tbody>
   </table></div>
@@ -339,9 +559,21 @@ async function facilities() {
     <div><button class="sm sec" id="prev" ${fq.page <= 1 ? 'disabled' : ''}>‹ Trang trước</button> <span style="margin:0 8px">Trang <b>${d.page}</b> / ${pages}</span> <button class="sm sec" id="next" ${fq.page >= pages ? 'disabled' : ''}>Trang sau ›</button></div>
   </div>`;
 
-  const apply = () => { fq = { ...fq, q: $('#q').value, linhVuc: $('#lv').value, loaiHinh: $('#lh').value, trangThai: $('#tt').value, page: 1 }; facilities(); };
+  const apply = () => {
+    fq = {
+      ...fq,
+      q: $('#q').value,
+      canBo: $('#cb') ? $('#cb').value : '',
+      linhVuc: $('#lv').value,
+      loaiHinh: $('#lh').value,
+      trangThai: $('#tt').value,
+      page: 1,
+    };
+    facilities();
+  };
   $('#go').onclick = apply;
   $('#q').onkeydown = (e) => e.key === 'Enter' && apply();
+  if ($('#cb')) $('#cb').onchange = apply;
   $('#lv').onchange = () => { fq.linhVuc = $('#lv').value; fq.loaiHinh = ''; fq.page = 1; facilities(); };
   $('#lh').onchange = apply;
   $('#tt').onchange = apply;
@@ -364,7 +596,7 @@ function editFacility(f) {
 /* ---------- Loại hình cơ sở (gom theo 10 lĩnh vực) ---------- */
 let tFilter = { q: '', lv: '' };
 async function types() {
-  const isAdmin = ME && ME.role === 'admin';
+  const canEditTypes = hasPerm('manageTypes');
   const qLow = tFilter.q.trim().toLowerCase();
 
   const groupsHtml = LV_IDS.filter((id) => !tFilter.lv || tFilter.lv === id).map((id) => {
@@ -397,7 +629,7 @@ async function types() {
             <th style="width:150px">Thuộc lĩnh vực</th>
             <th style="width:110px">Số cơ sở</th>
             <th style="width:130px">Chu kỳ KT</th>
-            ${isAdmin ? '<th style="width:120px">Thao tác</th>' : ''}
+            ${canEditTypes ? '<th style="width:120px">Thao tác</th>' : ''}
           </tr></thead>
           <tbody>
             ${items.map((t, idx) => `<tr>
@@ -406,7 +638,7 @@ async function types() {
               <td><span class="lv-badge">Lĩnh vực ${id}</span></td>
               <td>${t.soCoSo ? `<span class="tag green">${t.soCoSo} cơ sở</span>` : '<span style="color:#94a3b8">0</span>'}</td>
               <td>${t.chuKyKiemTraThang ? `${esc(t.chuKyKiemTraThang)} tháng` : '—'}</td>
-              ${isAdmin ? `<td style="white-space:nowrap"><button class="sm" data-e="${t._id}">Sửa</button> <button class="sm sec" data-d="${t._id}">Xóa</button></td>` : ''}
+              ${canEditTypes ? `<td style="white-space:nowrap"><button class="sm" data-e="${t._id}">Sửa</button> <button class="sm sec" data-d="${t._id}">Xóa</button></td>` : ''}
             </tr>`).join('')}
           </tbody>
         </table>
@@ -419,7 +651,7 @@ async function types() {
       <h2>🗂️ Danh mục Loại hình cơ sở PCCC (${TYPES.length} loại hình / 10 lĩnh vực)</h2>
       <p class="sub-note">Chuẩn hóa và gom nhóm theo 10 lĩnh vực PCCC</p>
     </div>
-    ${isAdmin ? '<button class="ok" id="add">+ Thêm loại hình</button>' : ''}
+    ${canEditTypes ? '<button class="ok" id="add">+ Thêm loại hình</button>' : ''}
   </div>
   <div class="bar">
     <input id="tq" placeholder="🔍 Tìm theo tên loại hình cơ sở..." value="${esc(tFilter.q)}" style="flex:1;min-width:240px">
@@ -476,22 +708,31 @@ const CHECKLIST = [
   'Đèn chiếu sáng sự cố, đèn exit', 'Họp huấn luyện, diễn tập PCCC định kỳ',
 ];
 async function inspections() {
+  const canInspect = hasPerm('manageInspections');
   const [list, facs] = await Promise.all([api('/inspections'), api('/facilities?limit=500&trangThai=all')]);
   const name = Object.fromEntries(facs.items.map((f) => [f._id, f.ten]));
   app.innerHTML = `<div class="page-head"><div><h2>📋 Biên bản kiểm tra an toàn PCCC</h2><p class="sub-note">Chọn cơ sở bên trang <a href="#/facilities">Danh sách cơ sở</a> → bấm nút <b>Kiểm tra</b> để lập biên bản mới</p></div></div>
-  <div class="table-wrap"><table><thead><tr><th>Số biên bản</th><th>Ngày kiểm tra</th><th>Tên cơ sở</th><th>Kết luận</th><th>Thao tác</th></tr></thead><tbody>
-  ${list.map((i) => `<tr><td><b>${esc(i.soBienBan)}</b></td><td>${esc(i.ngayKiemTra)}</td><td>${esc(name[i.facilityId] || '(đã xóa)')}</td>
-  <td><span class="tag ${i.ketLuan === 'Đạt' ? 'green' : 'red'}">${esc(i.ketLuan)}</span></td>
-  <td><a class="btn sm" href="#/inspection/${i._id}">🖨 Xem / In</a> <button class="sm sec" data-d="${i._id}">Xóa</button></td></tr>`).join('')}</tbody></table></div>`;
+  <div class="table-wrap"><table><thead><tr><th>Số biên bản</th><th>Ngày kiểm tra</th><th>Tên cơ sở</th><th>Cán bộ phụ trách</th><th>Kết luận</th><th>Thao tác</th></tr></thead><tbody>
+  ${list.map((i) => `<tr>
+    <td><b>${esc(i.soBienBan)}</b></td>
+    <td>${esc(i.ngayKiemTra)}</td>
+    <td>${esc(name[i.facilityId] || '(đã xóa)')}</td>
+    <td><span class="tag blue">👤 ${esc(i.canBoHoTen || i.canBoUsername || '—')}</span></td>
+    <td><span class="tag ${i.ketLuan === 'Đạt' ? 'green' : 'red'}">${esc(i.ketLuan)}</span></td>
+    <td>
+      <a class="btn sm" href="#/inspection/${i._id}">🖨 Xem / In</a>
+      ${canInspect ? `<button class="sm sec" data-d="${i._id}">Xóa</button>` : ''}
+    </td>
+  </tr>`).join('')}</tbody></table></div>`;
   app.querySelectorAll('[data-d]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Xóa biên bản?')) { await api('/inspections/' + b.dataset.d, 'DELETE'); inspections(); } })));
 }
 async function inspectionForm(fid) {
   const f = await api('/facilities/' + fid);
   app.innerHTML = `<div class="page-head"><div><h2>📝 Lập biên bản kiểm tra PCCC</h2></div></div>
-  <div class="card"><b style="font-size:18px">${esc(f.ten)}</b>${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))} — Lĩnh vực ID ${esc(f.linhVuc)}: ${esc(f.loaiHinh)}</div><br>
+  <div class="card"><b style="font-size:18px">${esc(f.ten)}</b>${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))} — Lĩnh vực ${esc(f.linhVuc)}: ${esc(f.loaiHinh)}</div><br>
   <div class="grid"><div><label>Ngày kiểm tra</label><input type="date" id="i_ngay" value="${new Date().toISOString().slice(0, 10)}"></div>
   <div><label>Loại kiểm tra</label><select id="i_loai"><option>Định kỳ</option><option>Đột xuất</option><option>Theo dõi khắc phục</option></select></div>
-  <div><label>Đoàn kiểm tra</label><input id="i_doan"></div><div><label>Người đại diện cơ sở</label><input id="i_dd" value="${esc(f.nguoiDaiDien)}"></div></div>
+  <div><label>Đoàn kiểm tra</label><input id="i_doan" value="${esc(ME?.hoTen || '')}"></div><div><label>Người đại diện cơ sở</label><input id="i_dd" value="${esc(f.nguoiDaiDien)}"></div></div>
   <h3>Nội dung kiểm tra</h3><div class="chk"><span class="h">Nội dung</span><span class="h">Đạt</span><span class="h">Không đạt</span><span class="h">N/A</span>
   ${CHECKLIST.map((c, n) => `<span>${esc(c)}</span>${['Đạt', 'Không đạt', 'N/A'].map((v, k) => `<input type="radio" name="c${n}" value="${v}" ${k === 0 ? 'checked' : ''}>`).join('')}`).join('')}</div>
   <div class="grid" style="margin-top:12px"><div class="full"><label>Vi phạm / tồn tại phát hiện</label><textarea id="i_vp" rows="3"></textarea></div>
@@ -515,7 +756,7 @@ async function inspectionPrint(id) {
   <div class="paper"><p class="c"><b>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br>Độc lập - Tự do - Hạnh phúc</p>
   <h3>Biên bản kiểm tra an toàn về phòng cháy và chữa cháy<br><small>Số: ${esc(i.soBienBan)}</small></h3>
   <p>Hôm nay, ngày ${vnDate(i.ngayKiemTra)}, đoàn kiểm tra (${esc(i.doanKiemTra) || '...'}) đã tiến hành kiểm tra (${esc(i.loaiKiemTra)}) đối với:</p>
-  <p><b>Cơ sở:</b> ${esc(f.ten)}<br><b>Địa chỉ:</b> ${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))}<br><b>Thuộc lĩnh vực:</b> ID ${esc(f.linhVuc)} (${esc(LINH_VUC_MAP[parentLvId(f.linhVuc)] || '')}) — <b>Loại hình:</b> ${esc(f.loaiHinh)}<br><b>Số hồ sơ:</b> ${esc(f.soHoSo)} — <b>Quy mô:</b> ${f.soTang ?? '...'} tầng, ${f.dienTichSan ?? '...'} m² sàn<br><b>Người đại diện:</b> ${esc(i.nguoiDaiDien)}</p>
+  <p><b>Cơ sở:</b> ${esc(f.ten)}<br><b>Địa chỉ:</b> ${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))}<br><b>Thuộc lĩnh vực:</b> Lĩnh vực ${esc(f.linhVuc)} (${esc(LINH_VUC_MAP[parentLvId(f.linhVuc)] || '')}) — <b>Loại hình:</b> ${esc(f.loaiHinh)}<br><b>Số hồ sơ:</b> ${esc(f.soHoSo)} — <b>Quy mô:</b> ${f.soTang ?? '...'} tầng, ${f.dienTichSan ?? '...'} m² sàn<br><b>Người đại diện:</b> ${esc(i.nguoiDaiDien)}</p>
   <table><tr><th>TT</th><th>Nội dung</th><th>Kết quả</th></tr>${(i.checklist || []).map((c, n) => `<tr><td>${n + 1}</td><td>${esc(c.noiDung)}</td><td>${esc(c.ketQua)}</td></tr>`).join('')}</table>
   <p><b>Vi phạm, tồn tại:</b><br>${esc(i.viPham || 'Không').replace(/\n/g, '<br>')}</p>
   <p><b>Kiến nghị:</b><br>${esc(i.kienNghi || 'Không').replace(/\n/g, '<br>')}<br>Hạn khắc phục: ${vnDate(i.hanKhacPhuc)}</p>
@@ -526,14 +767,54 @@ async function inspectionPrint(id) {
 /* ---------- Tăng / giảm ---------- */
 let chThang = new Date().toISOString().slice(0, 7);
 async function changes() {
+  const canChange = hasPerm('manageChanges');
   const list = await api('/changes?thang=' + chThang);
-  const row = (c) => `<tr><td><b>${esc(c.snapshot?.ten)}</b></td><td>${esc([c.snapshot?.soNha, c.snapshot?.khuPho, c.snapshot?.phuong].filter(Boolean).join(', '))}</td><td>${renderLvBadge(c.snapshot?.linhVuc)}</td><td>${esc(c.snapshot?.loaiHinh)}</td><td>${esc(c.lyDo)}</td><td class="noprint"><button class="sm sec" data-d="${c._id}">Hủy phiếu</button></td></tr>`;
-  const sect = (loai, title) => { const l = list.filter((c) => c.loai === loai); return `<h3>${title} (${l.length})</h3><div class="table-wrap"><table><thead><tr><th>Tên cơ sở</th><th>Địa chỉ</th><th>Thuộc lĩnh vực</th><th>Loại hình</th><th>Ghi chú / lý do</th><th class="noprint"></th></tr></thead><tbody>${l.map(row).join('')}</tbody></table></div>`; };
+  const row = (c) => `<tr>
+    <td><b>${esc(c.snapshot?.ten)}</b></td>
+    <td>${esc([c.snapshot?.soNha, c.snapshot?.khuPho, c.snapshot?.phuong].filter(Boolean).join(', '))}</td>
+    <td>${renderLvBadge(c.snapshot?.linhVuc)}</td>
+    <td>${esc(c.snapshot?.loaiHinh)}</td>
+    <td><span class="tag blue">👤 ${esc(c.canBoHoTen || c.canBoUsername || '—')}</span></td>
+    <td>${esc(c.lyDo)}</td>
+    <td class="noprint" style="white-space:nowrap">
+      ${canChange ? `<button class="sm" data-ech="${c._id}">Sửa</button> <button class="sm sec" data-d="${c._id}">Xóa / Hoàn tác</button>` : ''}
+    </td>
+  </tr>`;
+  const sect = (loai, title) => {
+    const l = list.filter((c) => c.loai === loai);
+    return `<h3>${title} (${l.length})</h3><div class="table-wrap"><table><thead><tr><th>Tên cơ sở</th><th>Địa chỉ</th><th>Thuộc lĩnh vực</th><th>Loại hình</th><th>Cán bộ phụ trách</th><th>Ghi chú / lý do</th><th class="noprint">Thao tác</th></tr></thead><tbody>${l.map(row).join('')}</tbody></table></div>`;
+  };
   app.innerHTML = `<div class="page-head"><div><h2>📈 Danh sách tăng, giảm cơ sở tháng ${chThang.split('-').reverse().join('/')}</h2><p class="sub-note">Theo dõi biến động cơ sở PCCC hàng tháng</p></div></div>
-  <div class="bar noprint"><input type="month" id="th" value="${chThang}"><button id="tang" class="ok">+ Tăng cơ sở</button><button id="giam">− Giảm cơ sở</button><button class="sec" onclick="print()">🖨 In danh sách</button></div>
+  <div class="bar noprint">
+    <input type="month" id="th" value="${chThang}">
+    ${canChange ? '<button id="tang" class="ok">+ Tăng cơ sở</button><button id="giam">− Giảm cơ sở</button>' : ''}
+    <button class="sec" onclick="print()">🖨 In danh sách</button>
+  </div>
   ${sect('tang', 'DANH SÁCH TĂNG CƠ SỞ')}${sect('giam', 'DANH SÁCH GIẢM CƠ SỞ')}`;
+
   $('#th').onchange = (e) => { chThang = e.target.value; changes(); };
-  app.querySelectorAll('[data-d]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Hủy phiếu và hoàn tác?')) { await api('/changes/' + b.dataset.d, 'DELETE'); changes(); } })));
+  app.querySelectorAll('[data-ech]').forEach((b) => {
+    b.onclick = () => {
+      const c = list.find((x) => x._id === b.dataset.ech);
+      if (!c) return;
+      modal(`<h3>✏️ Sửa phiếu ${c.loai === 'tang' ? 'Tăng' : 'Giảm'} cơ sở</h3>
+        <div class="grid">
+          <div class="full"><label>Tên cơ sở</label><input id="ec_ten" value="${esc(c.snapshot?.ten || '')}"></div>
+          <div><label>Tháng biến động</label><input type="month" id="ec_thang" value="${esc(c.thang)}"></div>
+          <div><label>Ghi chú / Lý do</label><input id="ec_lydo" value="${esc(c.lyDo || '')}"></div>
+        </div>
+        <p style="margin-top:16px"><button id="save">💾 Lưu thay đổi</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
+      $('#save').onclick = safe(async () => {
+        await api('/changes/' + c._id, 'PUT', {
+          ten: $('#ec_ten').value.trim(),
+          thang: $('#ec_thang').value,
+          lyDo: $('#ec_lydo').value.trim(),
+        });
+        closeModal(); changes();
+      });
+    };
+  });
+  app.querySelectorAll('[data-d]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Xóa phiếu và hoàn tác trạng thái cơ sở?')) { await api('/changes/' + b.dataset.d, 'DELETE'); changes(); } })));
   if ($('#tang')) $('#tang').onclick = () => {
     modal(`<h3>➕ Tăng cơ sở — tháng ${chThang}</h3>${facilityForm({}, 'n')}<p><button id="save">Lưu</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
     bindFacilityFormEvents('n');
