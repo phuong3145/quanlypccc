@@ -547,6 +547,7 @@ async function facilities() {
         <td><span class="tag blue">👤 ${esc(f.canBoHoTen || f.canBoUsername || '—')}</span></td>
         <td>${esc(f.lanKiemTraCuoi || '—')}</td>
         <td style="white-space:nowrap">
+          <button class="sm info" data-view="${f._id}">Chi tiết</button>
           ${canManage ? `<button class="sm" data-edit="${f._id}">Sửa</button>` : ''}
           ${canInspect ? `<a class="btn sm amber" href="#/new-inspection/${f._id}">Kiểm tra</a>` : ''}
           ${canManage ? `<button class="sm sec" data-del="${f._id}">Xóa</button>` : ''}
@@ -580,8 +581,51 @@ async function facilities() {
   $('#prev').onclick = () => { fq.page--; facilities(); };
   $('#next').onclick = () => { fq.page++; facilities(); };
   if ($('#add')) $('#add').onclick = () => editFacility();
+  app.querySelectorAll('[data-view]').forEach((b) => (b.onclick = () => viewFacility(d.items.find((x) => x._id === b.dataset.view))));
   app.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => editFacility(d.items.find((x) => x._id === b.dataset.edit))));
   app.querySelectorAll('[data-del]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Xóa cơ sở này?')) { await api('/facilities/' + b.dataset.del, 'DELETE'); facilities(); } })));
+}
+
+function viewFacility(f) {
+  if (!f) return;
+  const lvId = parentLvId(f.linhVuc);
+  const lvName = LINH_VUC_MAP[lvId] || f.tenLinhVuc || '—';
+  const rows = [
+    ['Tên cơ sở', f.ten, true],
+    ['Số hồ sơ', f.soHoSo],
+    ['Số tài khoản', f.soTaiKhoan],
+    ['Trạng thái hoạt động', f.trangThai === 'giam' ? `Đã giảm (${f.thangGiam || ''} - ${f.lyDoGiam || ''})` : 'Đang hoạt động'],
+    ['Cán bộ phụ trách', `${f.canBoHoTen || f.canBoUsername || '—'} ${f.canBoUsername ? `(${f.canBoUsername})` : ''}`],
+    ['Thuộc lĩnh vực PCCC', lvId ? `Lĩnh vực ${lvId} — ${lvName}` : '—', true],
+    ['Loại hình cơ sở', f.loaiHinh, true],
+    ['Số nhà, tên đường', f.soNha],
+    ['Khu phố / KCN', f.khuPho],
+    ['Phường / Xã', f.phuong],
+    ['Tháng/năm hoạt động', f.thangNamHoatDong],
+    ['Số tầng nổi / tầng hầm', `${f.soTang ?? '—'} tầng nổi / ${f.soTangHam ?? 0} tầng hầm`],
+    ['Diện tích mặt bằng (m²)', f.dienTichMatBang],
+    ['Tổng diện tích sàn (m²)', f.dienTichSan],
+    ['Khối tích (m³)', f.khoiTich],
+    ['Phân loại theo Nghị định', f.phanLoai],
+    ['Thẩm duyệt / Nghiệm thu', f.thamDuyet],
+    ['Thông tin đặc thù', f.thongTinDacThu, true],
+    ['Tình trạng vi phạm', f.tinhTrangViPham, true],
+    ['Người đại diện / Phụ trách CS', f.nguoiDaiDien],
+    ['Số điện thoại', f.dienThoai],
+    ['Đơn vị quản lý', f.donViQuanLy],
+    ['Lần kiểm tra cuối', f.lanKiemTraCuoi ? `${f.lanKiemTraCuoi} (${f.ketQuaKiemTraCuoi || ''})` : '—'],
+    ['Ghi chú', f.ghiChu, true],
+  ];
+  modal(`<h3>📋 Hồ sơ chi tiết cơ sở PCCC</h3>
+    <div class="detail-grid">
+      ${rows.map(([lbl, val, full]) => `<div class="detail-item ${full ? 'full' : ''}"><span>${esc(lbl)}</span><b>${esc(val !== undefined && val !== '' && val !== null ? val : '—')}</b></div>`).join('')}
+    </div>
+    <p style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+      ${hasPerm('manageFacilities') ? `<button id="v_edit">✏️ Sửa thông tin</button>` : ''}
+      ${hasPerm('manageInspections') ? `<a class="btn amber" href="#/new-inspection/${f._id}" onclick="closeModal()">📝 Lập biên bản kiểm tra</a>` : ''}
+      <button class="sec" onclick="closeModal()">Đóng</button>
+    </p>`);
+  if ($('#v_edit')) $('#v_edit').onclick = () => editFacility(f);
 }
 
 function editFacility(f) {
