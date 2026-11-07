@@ -96,6 +96,16 @@ function modal(html) { $('#modalBox').innerHTML = html; $('#modal').classList.re
 function closeModal() { $('#modal').classList.add('hidden'); }
 $('#modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal') closeModal(); });
 
+// Ngăn các phím tắt của trình duyệt / extension (như phím F, /) chặn việc gõ chữ trong ô input
+['keydown', 'keypress', 'keyup'].forEach((evt) => {
+  document.addEventListener(evt, (e) => {
+    const tag = e.target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+      e.stopPropagation();
+    }
+  }, false);
+});
+
 const WARD_NAMES = [
   'Phường Tân Thuận',
   'Phường Phú Thuận',
@@ -182,7 +192,7 @@ function facilityForm(f = {}, prefix = 'f') {
         const list = f[k] && !opts.includes(f[k]) ? [...opts, f[k]] : opts;
         input = `<select id="${id}">${list.map((o) => `<option ${o === f[k] ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
       } else {
-        input = `<input id="${id}" value="${v}" ${kind === 'number' ? 'type="number" step="any"' : ''}>`;
+        input = `<input id="${id}" type="${kind === 'number' ? 'number' : 'text'}" value="${v}" autocomplete="off" ${kind === 'number' ? 'step="any"' : ''}>`;
       }
       return `<div class="${kind === 'full' ? 'full' : ''}"><label for="${id}">${label}</label>${input}</div>`;
     }).join('') + '</div>';
@@ -373,8 +383,8 @@ async function users() {
     const initPerms = { ...(ROLE_DEFAULTS[initRole] || ROLE_DEFAULTS.canbo), ...(u?.permissions || {}) };
     modal(`<h3>${u ? `🔐 Phân quyền &amp; Sửa tài khoản: ${esc(u.username)}` : '➕ Cấp tài khoản mới &amp; Phân quyền'}</h3>
     <div class="grid">
-      ${u ? '' : '<div><label>Tên đăng nhập *</label><input id="u_name" placeholder="vd: tuannghia"></div>'}
-      <div><label>Họ và tên *</label><input id="u_ht" value="${esc(u?.hoTen || '')}" placeholder="Nhập họ tên cán bộ..."></div>
+      ${u ? '' : '<div><label>Tên đăng nhập *</label><input id="u_name" type="text" autocomplete="off" placeholder="vd: tuannghia"></div>'}
+      <div><label>Họ và tên *</label><input id="u_ht" type="text" autocomplete="off" value="${esc(u?.hoTen || '')}" placeholder="Nhập họ tên cán bộ..."></div>
       <div>
         <label>Vai trò (Chọn để áp dụng mẫu quyền mặc định)</label>
         <select id="u_role">
@@ -516,8 +526,8 @@ async function facilities() {
     </div>
     ${canManage ? '<button class="ok" id="add">+ Thêm cơ sở mới</button>' : ''}
   </div>
-  <div class="bar">
-    <input id="q" placeholder="🔍 Tìm tên cơ sở, số hồ sơ, mã tài khoản, địa chỉ..." value="${esc(fq.q)}">
+  <form class="bar" id="facFilterForm" autocomplete="off">
+    <input id="q" name="q" type="text" autocomplete="off" placeholder="🔍 Tìm tên cơ sở, số hồ sơ, mã tài khoản, địa chỉ..." value="${esc(fq.q)}">
     <select id="ph">
       <option value="">📍 Tất cả 4 phường</option>
       ${WARD_NAMES.map((w) => `<option value="${esc(w)}" ${fq.phuong === w ? 'selected' : ''}>${esc(w)}</option>`).join('')}
@@ -539,8 +549,8 @@ async function facilities() {
       <option value="giam" ${fq.trangThai === 'giam' ? 'selected' : ''}>Đã giảm</option>
       <option value="all" ${fq.trangThai === 'all' ? 'selected' : ''}>Tất cả trạng thái</option>
     </select>
-    <button id="go">Lọc kết quả</button>
-  </div>
+    <button type="submit" id="go">Lọc kết quả</button>
+  </form>
   <div class="table-wrap"><table>
     <thead><tr>
       <th>Tên cơ sở &amp; Hồ sơ</th>
@@ -588,8 +598,7 @@ async function facilities() {
     };
     facilities();
   };
-  $('#go').onclick = apply;
-  $('#q').onkeydown = (e) => e.key === 'Enter' && apply();
+  $('#facFilterForm').onsubmit = (e) => { e.preventDefault(); apply(); };
   $('#ph').onchange = apply;
   if ($('#cb')) $('#cb').onchange = apply;
   $('#lv').onchange = () => { fq.linhVuc = $('#lv').value; fq.loaiHinh = ''; fq.page = 1; facilities(); };
@@ -782,20 +791,19 @@ async function types() {
     </div>
     ${canEditTypes ? '<button class="ok" id="add">+ Thêm loại hình</button>' : ''}
   </div>
-  <div class="bar">
-    <input id="tq" placeholder="🔍 Tìm theo tên loại hình cơ sở..." value="${esc(tFilter.q)}" style="flex:1;min-width:240px">
+  <form class="bar" id="typeFilterForm" autocomplete="off">
+    <input id="tq" name="tq" type="text" autocomplete="off" placeholder="🔍 Tìm theo tên loại hình cơ sở..." value="${esc(tFilter.q)}" style="flex:1;min-width:240px">
     <select id="tlv">
       <option value="">Tất cả 10 nhóm lĩnh vực</option>
       ${LV_IDS.map((id) => `<option value="${id}" ${tFilter.lv === id ? 'selected' : ''}>Lĩnh vực ${id}: ${esc(LINH_VUC_MAP[id])}</option>`).join('')}
     </select>
-    <button id="tgo">Lọc</button>
-    <button class="sec" id="toggleAll">Thu gọn / Mở rộng tất cả</button>
-  </div>
+    <button type="submit" id="tgo">Lọc</button>
+    <button type="button" class="sec" id="toggleAll">Thu gọn / Mở rộng tất cả</button>
+  </form>
   <div id="lvGroups">${groupsHtml || '<div class="card">Không tìm thấy loại hình phù hợp.</div>'}</div>`;
 
   const applyFilter = () => { tFilter = { q: $('#tq').value, lv: $('#tlv').value }; types(); };
-  $('#tgo').onclick = applyFilter;
-  $('#tq').onkeydown = (e) => e.key === 'Enter' && applyFilter();
+  $('#typeFilterForm').onsubmit = (e) => { e.preventDefault(); applyFilter(); };
   $('#tlv').onchange = applyFilter;
   $('#toggleAll').onclick = () => {
     const groups = [...app.querySelectorAll('.lv-group')];
@@ -814,7 +822,7 @@ async function types() {
         <select id="t_lv">${LV_IDS.map((id) => `<option value="${id}" ${id === curLv ? 'selected' : ''}>Lĩnh vực ${id}: ${esc(LINH_VUC_MAP[id])}</option>`).join('')}</select>
       </div>
       <div><label>Chu kỳ kiểm tra (tháng)</label><input id="t_ck" type="number" value="${esc(t?.chuKyKiemTraThang ?? '')}"></div>
-      <div class="full"><label>Tên loại hình cơ sở *</label><input id="t_ten" value="${esc(t?.ten || '')}"></div>
+      <div class="full"><label>Tên loại hình cơ sở *</label><input id="t_ten" type="text" autocomplete="off" value="${esc(t?.ten || '')}"></div>
       <div class="full"><label>Ghi chú / Mô tả</label><textarea id="t_mt">${esc(t?.moTa || '')}</textarea></div>
     </div>
     <p><button id="save">Lưu</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
@@ -861,7 +869,7 @@ async function inspectionForm(fid) {
   <div class="card"><b style="font-size:18px">${esc(f.ten)}</b>${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))} — Lĩnh vực ${esc(f.linhVuc)}: ${esc(f.loaiHinh)}</div><br>
   <div class="grid"><div><label>Ngày kiểm tra</label><input type="date" id="i_ngay" value="${new Date().toISOString().slice(0, 10)}"></div>
   <div><label>Loại kiểm tra</label><select id="i_loai"><option>Định kỳ</option><option>Đột xuất</option><option>Theo dõi khắc phục</option></select></div>
-  <div><label>Đoàn kiểm tra</label><input id="i_doan" value="${esc(ME?.hoTen || '')}"></div><div><label>Người đại diện cơ sở</label><input id="i_dd" value="${esc(f.nguoiDaiDien)}"></div></div>
+  <div><label>Đoàn kiểm tra</label><input id="i_doan" type="text" autocomplete="off" value="${esc(ME?.hoTen || '')}"></div><div><label>Người đại diện cơ sở</label><input id="i_dd" type="text" autocomplete="off" value="${esc(f.nguoiDaiDien)}"></div></div>
   <h3>Nội dung kiểm tra</h3><div class="chk"><span class="h">Nội dung</span><span class="h">Đạt</span><span class="h">Không đạt</span><span class="h">N/A</span>
   ${CHECKLIST.map((c, n) => `<span>${esc(c)}</span>${['Đạt', 'Không đạt', 'N/A'].map((v, k) => `<input type="radio" name="c${n}" value="${v}" ${k === 0 ? 'checked' : ''}>`).join('')}`).join('')}</div>
   <div class="grid" style="margin-top:12px"><div class="full"><label>Vi phạm / tồn tại phát hiện</label><textarea id="i_vp" rows="3"></textarea></div>
@@ -950,9 +958,9 @@ async function changes() {
       if (!c) return;
       modal(`<h3>✏️ Sửa phiếu ${c.loai === 'tang' ? 'Tăng' : 'Giảm'} cơ sở</h3>
         <div class="grid">
-          <div class="full"><label>Tên cơ sở</label><input id="ec_ten" value="${esc(c.snapshot?.ten || '')}"></div>
+          <div class="full"><label>Tên cơ sở</label><input id="ec_ten" type="text" autocomplete="off" value="${esc(c.snapshot?.ten || '')}"></div>
           <div><label>Tháng biến động</label>${renderMonthYearSelect('ec_thang', c.thang)}</div>
-          <div><label>Ghi chú / Lý do</label><input id="ec_lydo" value="${esc(c.lyDo || '')}"></div>
+          <div><label>Ghi chú / Lý do</label><input id="ec_lydo" type="text" autocomplete="off" value="${esc(c.lyDo || '')}"></div>
         </div>
         <p style="margin-top:16px"><button id="save">💾 Lưu thay đổi</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
       $('#save').onclick = safe(async () => {
@@ -972,11 +980,18 @@ async function changes() {
     $('#save').onclick = safe(async () => { await api('/changes', 'POST', { loai: 'tang', thang: chThang, lyDo: $('#n_ghiChu').value, facility: readForm('n') }); closeModal(); changes(); });
   };
   if ($('#giam')) $('#giam').onclick = () => {
-    modal(`<h3>➖ Giảm cơ sở — ${vnMonthLabel(chThang)}</h3><div class="bar"><input id="gq" placeholder="Tìm cơ sở..."><button id="gs">Tìm</button></div><div id="gres"></div>
-    <div><label>Lý do giảm</label><input id="gly" placeholder="Ngưng hoạt động, chuyển địa điểm, ..."></div>`);
-    $('#gs').onclick = safe(async () => {
+    modal(`<h3>➖ Giảm cơ sở — ${vnMonthLabel(chThang)}</h3>
+    <form class="bar" id="giamSearchForm" autocomplete="off">
+      <input id="gq" name="gq" type="text" autocomplete="off" placeholder="🔍 Tìm tên cơ sở cần giảm..." style="flex:1">
+      <button type="submit" id="gs">Tìm</button>
+    </form>
+    <div id="gres"></div>
+    <div style="margin-top:10px"><label>Lý do giảm</label><input id="gly" type="text" autocomplete="off" placeholder="Ngưng hoạt động, chuyển địa điểm, ..."></div>
+    <p style="margin-top:14px"><button class="sec" onclick="closeModal()">Đóng</button></p>`);
+    $('#giamSearchForm').onsubmit = safe(async (e) => {
+      e.preventDefault();
       const d = await api('/facilities?limit=15&q=' + encodeURIComponent($('#gq').value));
-      $('#gres').innerHTML = `<div class="table-wrap"><table>${d.items.map((f) => `<tr><td><b>${esc(f.ten)}</b><br><small>${esc([f.soNha, f.phuong].filter(Boolean).join(', '))}</small></td><td>${renderLvBadge(f.linhVuc)}</td><td><button class="sm" data-g="${f._id}">Chọn giảm</button></td></tr>`).join('')}</table></div>`;
+      $('#gres').innerHTML = `<div class="table-wrap"><table>${d.items.map((f) => `<tr><td><b>${esc(f.ten)}</b><br><small>${esc([f.soNha, f.phuong].filter(Boolean).join(', '))}</small></td><td>${renderLvBadge(f.linhVuc)}</td><td><button type="button" class="sm" data-g="${f._id}">Chọn giảm</button></td></tr>`).join('')}</table></div>`;
       $('#gres').querySelectorAll('[data-g]').forEach((b) => (b.onclick = safe(async () => {
         await api('/changes', 'POST', { loai: 'giam', thang: chThang, lyDo: $('#gly').value, facilityId: b.dataset.g }); closeModal(); changes();
       })));

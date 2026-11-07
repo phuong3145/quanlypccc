@@ -37,7 +37,7 @@ h3{color:var(--slate-900);margin:18px 0 10px}
 
 /* Filter bar & Inputs */
 .bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;background:#fff;padding:12px 14px;border-radius:12px;box-shadow:0 1px 4px rgba(15,23,42,.06);border:1px solid var(--slate-200)}
-input,select,textarea{padding:8px 11px;border:1.5px solid #cbd5e1;border-radius:8px;font:inherit;width:100%;background:#fff;color:var(--slate-900);transition:border-color .15s,box-shadow .15s}
+input,select,textarea{padding:8px 11px;border:1.5px solid #cbd5e1;border-radius:8px;font:inherit;width:100%;background:#fff;color:var(--slate-900);transition:border-color .15s,box-shadow .15s;position:relative;z-index:2;pointer-events:auto;user-select:text;-webkit-user-select:text}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--red-500);box-shadow:0 0 0 3px rgba(220,38,38,.12)}
 .bar input,.bar select{width:auto;min-width:160px}
 .bar input#q{flex:1;min-width:220px}
