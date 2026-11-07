@@ -559,7 +559,6 @@ async function facilities() {
       <th>Loại hình cơ sở</th>
       <th>Quy mô</th>
       <th>Cán bộ phụ trách</th>
-      <th>Kiểm tra cuối</th>
       <th>Thao tác</th>
     </tr></thead>
     <tbody>
@@ -570,7 +569,6 @@ async function facilities() {
         <td>${esc(f.loaiHinh || '—')}</td>
         <td style="white-space:nowrap">${f.soTang ? `${f.soTang} tầng` : ''}${f.soTangHam ? ` (${f.soTangHam} hầm)` : ''}<br><small style="color:#64748b">${f.dienTichSan ? `${f.dienTichSan} m² sàn` : (f.dienTichMatBang ? `${f.dienTichMatBang} m² MB` : '')}</small></td>
         <td><span class="tag blue">👤 ${esc(f.canBoHoTen || f.canBoUsername || '—')}</span></td>
-        <td>${esc(f.lanKiemTraCuoi || '—')}</td>
         <td style="white-space:nowrap">
           <button class="sm info" data-view="${f._id}">Chi tiết</button>
           ${canManage ? `<button class="sm" data-edit="${f._id}">Sửa</button>` : ''}
