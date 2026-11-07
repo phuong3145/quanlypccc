@@ -895,6 +895,26 @@ async function inspectionPrint(id) {
 
 /* ---------- Tăng / giảm ---------- */
 let chThang = new Date().toISOString().slice(0, 7);
+const vnMonthLabel = (ym) => {
+  const [y, m] = String(ym || '').split('-');
+  return m && y ? `tháng ${m}/${y}` : ym;
+};
+function renderMonthYearSelect(prefix, ym) {
+  const [curY, curM] = String(ym || new Date().toISOString().slice(0, 7)).split('-');
+  const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+  const baseYear = new Date().getFullYear();
+  const years = Array.from({ length: 15 }, (_, i) => String(baseYear - 7 + i));
+  return `<div style="display:inline-flex;gap:6px;align-items:center">
+    <select id="${prefix}_m" style="min-width:125px">
+      ${months.map((m) => `<option value="${m}" ${m === curM ? 'selected' : ''}>📅 Tháng ${Number(m)}</option>`).join('')}
+    </select>
+    <select id="${prefix}_y" style="min-width:115px">
+      ${years.map((y) => `<option value="${y}" ${y === curY ? 'selected' : ''}>Năm ${y}</option>`).join('')}
+    </select>
+  </div>`;
+}
+const readMonthYear = (prefix) => `${$(`#${prefix}_y`).value}-${$(`#${prefix}_m`).value}`;
+
 async function changes() {
   const canChange = hasPerm('manageChanges');
   const list = await api('/changes?thang=' + chThang);
@@ -913,15 +933,17 @@ async function changes() {
     const l = list.filter((c) => c.loai === loai);
     return `<h3>${title} (${l.length})</h3><div class="table-wrap"><table><thead><tr><th>Tên cơ sở</th><th>Địa chỉ</th><th>Thuộc lĩnh vực</th><th>Loại hình</th><th>Cán bộ phụ trách</th><th>Ghi chú / lý do</th><th class="noprint">Thao tác</th></tr></thead><tbody>${l.map(row).join('')}</tbody></table></div>`;
   };
-  app.innerHTML = `<div class="page-head"><div><h2>📈 Danh sách tăng, giảm cơ sở tháng ${chThang.split('-').reverse().join('/')}</h2><p class="sub-note">Theo dõi biến động cơ sở PCCC hàng tháng</p></div></div>
+  app.innerHTML = `<div class="page-head"><div><h2>📈 Danh sách tăng, giảm cơ sở ${vnMonthLabel(chThang)}</h2><p class="sub-note">Theo dõi biến động cơ sở PCCC hàng tháng</p></div></div>
   <div class="bar noprint">
-    <input type="month" id="th" value="${chThang}">
+    ${renderMonthYearSelect('th', chThang)}
     ${canChange ? '<button id="tang" class="ok">+ Tăng cơ sở</button><button id="giam">− Giảm cơ sở</button>' : ''}
     <button class="sec" onclick="print()">🖨 In danh sách</button>
   </div>
   ${sect('tang', 'DANH SÁCH TĂNG CƠ SỞ')}${sect('giam', 'DANH SÁCH GIẢM CƠ SỞ')}`;
 
-  $('#th').onchange = (e) => { chThang = e.target.value; changes(); };
+  const onMonthChange = () => { chThang = readMonthYear('th'); changes(); };
+  $('#th_m').onchange = onMonthChange;
+  $('#th_y').onchange = onMonthChange;
   app.querySelectorAll('[data-ech]').forEach((b) => {
     b.onclick = () => {
       const c = list.find((x) => x._id === b.dataset.ech);
@@ -929,14 +951,14 @@ async function changes() {
       modal(`<h3>✏️ Sửa phiếu ${c.loai === 'tang' ? 'Tăng' : 'Giảm'} cơ sở</h3>
         <div class="grid">
           <div class="full"><label>Tên cơ sở</label><input id="ec_ten" value="${esc(c.snapshot?.ten || '')}"></div>
-          <div><label>Tháng biến động</label><input type="month" id="ec_thang" value="${esc(c.thang)}"></div>
+          <div><label>Tháng biến động</label>${renderMonthYearSelect('ec_thang', c.thang)}</div>
           <div><label>Ghi chú / Lý do</label><input id="ec_lydo" value="${esc(c.lyDo || '')}"></div>
         </div>
         <p style="margin-top:16px"><button id="save">💾 Lưu thay đổi</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
       $('#save').onclick = safe(async () => {
         await api('/changes/' + c._id, 'PUT', {
           ten: $('#ec_ten').value.trim(),
-          thang: $('#ec_thang').value,
+          thang: readMonthYear('ec_thang'),
           lyDo: $('#ec_lydo').value.trim(),
         });
         closeModal(); changes();
@@ -945,12 +967,12 @@ async function changes() {
   });
   app.querySelectorAll('[data-d]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Xóa phiếu và hoàn tác trạng thái cơ sở?')) { await api('/changes/' + b.dataset.d, 'DELETE'); changes(); } })));
   if ($('#tang')) $('#tang').onclick = () => {
-    modal(`<h3>➕ Tăng cơ sở — tháng ${chThang}</h3>${facilityForm({}, 'n')}<p><button id="save">Lưu</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
+    modal(`<h3>➕ Tăng cơ sở — ${vnMonthLabel(chThang)}</h3>${facilityForm({}, 'n')}<p><button id="save">Lưu</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
     bindFacilityFormEvents('n');
     $('#save').onclick = safe(async () => { await api('/changes', 'POST', { loai: 'tang', thang: chThang, lyDo: $('#n_ghiChu').value, facility: readForm('n') }); closeModal(); changes(); });
   };
   if ($('#giam')) $('#giam').onclick = () => {
-    modal(`<h3>➖ Giảm cơ sở — tháng ${chThang}</h3><div class="bar"><input id="gq" placeholder="Tìm cơ sở..."><button id="gs">Tìm</button></div><div id="gres"></div>
+    modal(`<h3>➖ Giảm cơ sở — ${vnMonthLabel(chThang)}</h3><div class="bar"><input id="gq" placeholder="Tìm cơ sở..."><button id="gs">Tìm</button></div><div id="gres"></div>
     <div><label>Lý do giảm</label><input id="gly" placeholder="Ngưng hoạt động, chuyển địa điểm, ..."></div>`);
     $('#gs').onclick = safe(async () => {
       const d = await api('/facilities?limit=15&q=' + encodeURIComponent($('#gq').value));
