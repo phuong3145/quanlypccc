@@ -31,17 +31,16 @@ const FAC_FIELDS = [
   'soTangHam', 'dienTichMatBang', 'nhomLoaiHinh',
 ];
 const { GROUPS, LINH_VUC_MAP, normalizeWard, normalizeFacilityType } = require('../lib/catalog');
+const { getCache, setCache, clearCache } = require('../lib/cache');
 const num = (o, ks) => ks.forEach((k) => { if (o[k] !== undefined && o[k] !== '') o[k] = Number(o[k]); });
 
-// Cache ngắn hạn trên bộ nhớ Serverless (60s) cho types & stats, tự xóa khi có thao tác ghi
-const MEM_CACHE = new Map();
-const getCache = (k) => {
-  const e = MEM_CACHE.get(k);
-  return e && e.exp > Date.now() ? e.val : null;
-};
-const setCache = (k, val, ttlMs = 60000) => MEM_CACHE.set(k, { val, exp: Date.now() + ttlMs });
+// Tự động xóa cache (Memory + Upstash Redis) khi có thao tác thêm/sửa/xóa
 app.use('/api', (req, res, next) => {
-  if (req.method !== 'GET') MEM_CACHE.clear();
+  if (req.method !== 'GET') {
+    res.on('finish', () => {
+      if (res.statusCode < 400) clearCache().catch(() => {});
+    });
+  }
   next();
 });
 
@@ -68,8 +67,11 @@ app.get('/api/catalog', (req, res) => {
 });
 
 app.get('/api/types', wrap(async (req, res) => {
-  const cached = getCache('types');
-  if (cached) return res.json(cached);
+  const cached = await getCache('types');
+  if (cached) {
+    res.setHeader('X-Cache', `HIT-${cached.source}`);
+    return res.json(cached.val);
+  }
   const db = await getDb();
   const [types, counts] = await Promise.all([
     db.collection('types').find().sort({ thuTu: 1, ten: 1 }).toArray(),
@@ -85,7 +87,8 @@ app.get('/api/types', wrap(async (req, res) => {
     tenLinhVuc: t.tenLinhVuc || LINH_VUC_MAP[String(t.linhVuc || '').split('.')[0]] || '',
     soCoSo: countMap[t.ten] || 0,
   }));
-  setCache('types', result);
+  await setCache('types', result, 300);
+  res.setHeader('X-Cache', 'MISS');
   res.json(result);
 }));
 app.post('/api/types', wrap(async (req, res) => {
@@ -117,10 +120,16 @@ app.delete('/api/types/:id', wrap(async (req, res) => {
 
 /* ---------- Cơ sở ---------- */
 app.get('/api/facilities', wrap(async (req, res) => {
-  const db = await getDb();
   const { q, loaiHinh, phuong, trangThai = 'hoatdong', linhVuc } = req.query;
   const page = Math.max(1, +req.query.page || 1);
   const limit = Math.min(500, +req.query.limit || 20);
+  const cacheKey = `facilities:${trangThai}:${linhVuc || ''}:${loaiHinh || ''}:${phuong || ''}:${q || ''}:${page}:${limit}`;
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    res.setHeader('X-Cache', `HIT-${cached.source}`);
+    return res.json(cached.val);
+  }
+  const db = await getDb();
   const f = {};
   if (trangThai !== 'all') f.trangThai = trangThai;
   if (loaiHinh) f.loaiHinh = loaiHinh;
@@ -135,7 +144,10 @@ app.get('/api/facilities', wrap(async (req, res) => {
     col.find(f).sort({ ten: 1 }).skip((page - 1) * limit).limit(limit).toArray(),
     col.countDocuments(f),
   ]);
-  res.json({ items, total, page, limit });
+  const result = { items, total, page, limit };
+  await setCache(cacheKey, result, 180);
+  res.setHeader('X-Cache', 'MISS');
+  res.json(result);
 }));
 app.get('/api/facilities/:id', wrap(async (req, res) => {
   const db = await getDb();
@@ -259,8 +271,11 @@ app.delete('/api/changes/:id', wrap(async (req, res) => {
 
 /* ---------- Thống kê ---------- */
 app.get('/api/stats', wrap(async (req, res) => {
-  const cached = getCache('stats');
-  if (cached) return res.json(cached);
+  const cached = await getCache('stats');
+  if (cached) {
+    res.setHeader('X-Cache', `HIT-${cached.source}`);
+    return res.json(cached.val);
+  }
   const db = await getDb();
   const facs = db.collection('facilities');
   const act = { trangThai: 'hoatdong' };
@@ -274,7 +289,8 @@ app.get('/api/stats', wrap(async (req, res) => {
     db.collection('inspections').countDocuments(),
   ]);
   const result = { total, byType, byWard, byField, tang, giam, inspections };
-  setCache('stats', result);
+  await setCache('stats', result, 300);
+  res.setHeader('X-Cache', 'MISS');
   res.json(result);
 }));
 
