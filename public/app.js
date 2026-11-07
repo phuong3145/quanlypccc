@@ -211,11 +211,12 @@ const readForm = (prefix = 'f') => {
 /* ---------- Router ---------- */
 const routes = { '': dashboard, facilities, wards, types, inspections, changes, users, logs, 'inspection': inspectionPrint, 'new-inspection': inspectionForm };
 const ADMIN_ROUTES = ['users', 'logs'];
+const SPINNER_HTML = '<div class="spin-screen"><div class="spinner"></div></div>';
 async function route() {
   if (!ME) return;
   const [name, arg] = location.hash.replace(/^#\/?/, '').split('/');
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === `#/${name}`));
-  app.innerHTML = 'Đang tải dữ liệu...';
+  app.innerHTML = SPINNER_HTML;
   try {
     if (ADMIN_ROUTES.includes(name) && !hasPerm('manageSystem')) throw new Error('Tài khoản không có quyền truy cập Quản trị hệ thống');
     await Promise.all([loadTypes(), loadOfficers()]);
