@@ -59,12 +59,12 @@ button.sm,.btn.sm{padding:5px 10px;font-size:12px;border-radius:6px}
 .detail-item b{font-size:14px;color:var(--slate-900);font-weight:600;word-break:break-word}
 
 /* Tables */
-.table-wrap{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(15,23,42,.06);border:1px solid var(--slate-200);overflow-x:auto}
-table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden}
-th,td{padding:11px 13px;border-bottom:1px solid var(--slate-200);text-align:left;vertical-align:middle}
-th{background:var(--slate-50);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--slate-600);border-bottom:2px solid var(--slate-200)}
-tbody tr:hover{background:#fffbeb}
-tbody tr:last-child td{border-bottom:0}
+.table-wrap{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(15,23,42,.08);border:1.5px solid #94a3b8;overflow-x:auto}
+table{width:100%;border-collapse:collapse;background:#fff}
+th,td{padding:11px 13px;border:1px solid #cbd5e1;text-align:left;vertical-align:middle}
+th{background:#e2e8f0;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#1e293b;border:1px solid #94a3b8;border-bottom:2px solid #64748b}
+tbody tr:nth-child(even){background:#f8fafc}
+tbody tr:hover{background:#fef3c7}
 
 /* Cards & Stats */
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px}

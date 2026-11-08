@@ -1,6 +1,6 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const XLSX = require('xlsx');
+const XLSX = require('xlsx-js-style');
 const { getDb } = require('../lib/db');
 const DEFAULT_DON_VI = 'Đội CC và CNCH KV7';
 
@@ -356,6 +356,50 @@ app.get('/api/facilities/export', wrap(async (req, res) => {
     const cellRef = XLSX.utils.encode_cell({ r: 3, c });
     ws[cellRef] = { t: 'n', v: row3[c], f: `COUNTA(${colLetter}5:${colLetter}${lastExcelRow})` };
   }
+
+  // Kẻ đường viền (border) bảng đầy đủ cho tiêu đề, dòng tổng và toàn bộ dòng dữ liệu
+  const thinBorder = {
+    top: { style: 'thin', color: { rgb: '334155' } },
+    bottom: { style: 'thin', color: { rgb: '334155' } },
+    left: { style: 'thin', color: { rgb: '334155' } },
+    right: { style: 'thin', color: { rgb: '334155' } },
+  };
+  const headerStyle = {
+    font: { name: 'Times New Roman', sz: 11, bold: true, color: { rgb: '0F172A' } },
+    fill: { fgColor: { rgb: 'E2E8F0' } },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border: thinBorder,
+  };
+  const countStyle = {
+    font: { name: 'Times New Roman', sz: 11, bold: true, color: { rgb: '991B1B' } },
+    fill: { fgColor: { rgb: 'FEF3C7' } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+    border: thinBorder,
+  };
+  const totalRows = 4 + dataRows.length;
+  const centerCols = new Set([0, 7, 9, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]);
+  for (let r = 1; r < totalRows; r++) {
+    for (let c = 0; c < 37; c++) {
+      const ref = XLSX.utils.encode_cell({ r, c });
+      if (!ws[ref]) ws[ref] = { t: 's', v: '' };
+      if (r === 1 || r === 2) {
+        ws[ref].s = headerStyle;
+      } else if (r === 3) {
+        ws[ref].s = countStyle;
+      } else {
+        ws[ref].s = {
+          font: { name: 'Times New Roman', sz: 11 },
+          alignment: {
+            horizontal: centerCols.has(c) ? 'center' : 'left',
+            vertical: 'center',
+            wrapText: true,
+          },
+          border: thinBorder,
+        };
+      }
+    }
+  }
+  ws['!rows'] = [{ hpt: 14 }, { hpt: 38 }, { hpt: 44 }, { hpt: 22 }];
 
   ws['!merges'] = [
     { s: { r: 1, c: 0 }, e: { r: 2, c: 0 } },
