@@ -10,13 +10,22 @@
 <body>
 <div id="authView" class="hidden"></div>
 <div id="shell" class="hidden">
+<header id="mobileBar">
+  <button type="button" id="menuToggle" aria-label="Mở menu"><i class="fa-solid fa-bars"></i></button>
+  <div class="m-brand">
+    <div class="brand-icon"><i class="fa-solid fa-shield-halved" style="color:#991b1b"></i></div>
+    <b>PCCC &amp; CNCH</b>
+  </div>
+</header>
+<div id="navOverlay"></div>
 <aside id="nav">
   <div class="brand">
     <div class="brand-icon"><i class="fa-solid fa-shield-halved" style="color:#991b1b"></i></div>
-    <div>
+    <div style="flex:1">
       <h1>PCCC &amp; CNCH</h1>
       <span>Quản lý cơ sở nghiệp vụ</span>
     </div>
+    <button type="button" id="menuClose" aria-label="Đóng menu"><i class="fa-solid fa-xmark"></i></button>
   </div>
   <nav class="nav-links">
     <small>NGHIỆP VỤ</small>

@@ -272,6 +272,7 @@ const ADMIN_ROUTES = ['users', 'logs'];
 const SPINNER_HTML = '<div class="spin-screen"><div class="spinner"></div></div>';
 async function route() {
   if (!ME) return;
+  $('#shell')?.classList.remove('nav-open');
   const [name, arg] = location.hash.replace(/^#\/?/, '').split('/');
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === `#/${name}`));
   app.innerHTML = SPINNER_HTML;
@@ -348,11 +349,16 @@ function authScreen(setup) {
 function start() {
   $('#authView').classList.add('hidden');
   $('#shell').classList.remove('hidden');
+  if ($('#menuToggle')) $('#menuToggle').onclick = () => $('#shell').classList.toggle('nav-open');
+  if ($('#menuClose')) $('#menuClose').onclick = () => $('#shell').classList.remove('nav-open');
+  if ($('#navOverlay')) $('#navOverlay').onclick = () => $('#shell').classList.remove('nav-open');
+  document.querySelectorAll('#nav a').forEach((a) => a.addEventListener('click', () => $('#shell').classList.remove('nav-open')));
   document.querySelectorAll('.adminOnly').forEach((e) => e.classList.toggle('hidden', !hasPerm('manageSystem')));
   $('#me').innerHTML = `<b><i class="fa-solid fa-user-shield"></i> ${esc(ME.hoTen)}</b><small>${esc(ROLE_NAME[ME.role] || ME.role)}</small>
     <button class="sm sec" id="chpw"><i class="fa-solid fa-key"></i> Đổi MK</button><button class="sm sec" id="logout"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>`;
   $('#logout').onclick = async () => { await api('/auth/logout', 'POST').catch(() => {}); ME = null; boot(); };
   $('#chpw').onclick = () => {
+    $('#shell').classList.remove('nav-open');
     modal(`<h3><i class="fa-solid fa-key"></i> Đổi mật khẩu</h3><div class="grid"><div class="full"><label>Mật khẩu cũ</label><input id="p0" type="password"></div>
       <div class="full"><label>Mật khẩu mới (≥ 6 ký tự)</label><input id="p1" type="password"></div></div><p><button id="save"><i class="fa-solid fa-floppy-disk"></i> Lưu</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
     $('#save').onclick = safe(async () => { await api('/auth/password', 'POST', { oldPassword: $('#p0').value, newPassword: $('#p1').value }); closeModal(); alert('Đã đổi mật khẩu'); });
@@ -398,29 +404,29 @@ async function users() {
   </div>
   <div class="table-wrap"><table>
     <thead><tr>
-      <th>Tên đăng nhập</th>
+      <th class="hide-mobile">Tên đăng nhập</th>
       <th>Họ và tên</th>
       <th>Vai trò</th>
-      <th>Số cơ sở phụ trách</th>
-      <th>Phân quyền chức năng</th>
-      <th>Trạng thái</th>
-      <th>Đăng nhập cuối</th>
+      <th class="hide-mobile">Số cơ sở phụ trách</th>
+      <th class="hide-mobile">Phân quyền chức năng</th>
+      <th class="hide-mobile">Trạng thái</th>
+      <th class="hide-mobile">Đăng nhập cuối</th>
       <th>Thao tác</th>
     </tr></thead>
     <tbody>
     ${list.map((u) => `<tr>
-      <td><b>${esc(u.username)}</b></td>
-      <td>${esc(u.hoTen)}</td>
+      <td class="hide-mobile"><b>${esc(u.username)}</b></td>
+      <td><b>${esc(u.hoTen)}</b><span class="only-mobile" style="display:block;font-size:11.5px;color:#64748b">${u.soCoSo || 0} cơ sở • ${u.active ? 'Hoạt động' : 'Đã khóa'}</span></td>
       <td><span class="tag ${ROLE_TAG[u.role] || 'blue'}">${esc(ROLE_NAME[u.role] || u.role)}</span></td>
-      <td><span class="tag ${u.soCoSo ? 'green' : ''}">${u.soCoSo || 0} cơ sở</span></td>
-      <td>${renderPermSummary(u)}</td>
-      <td><span class="tag ${u.active ? 'green' : 'red'}">${u.active ? 'Hoạt động' : 'Đã khóa'}</span></td>
-      <td>${u.lastLogin ? new Date(u.lastLogin).toLocaleString('vi-VN') : '—'}</td>
+      <td class="hide-mobile"><span class="tag ${u.soCoSo ? 'green' : ''}">${u.soCoSo || 0} cơ sở</span></td>
+      <td class="hide-mobile">${renderPermSummary(u)}</td>
+      <td class="hide-mobile"><span class="tag ${u.active ? 'green' : 'red'}">${u.active ? 'Hoạt động' : 'Đã khóa'}</span></td>
+      <td class="hide-mobile">${u.lastLogin ? new Date(u.lastLogin).toLocaleString('vi-VN') : '—'}</td>
       <td style="white-space:nowrap">
-        <button class="sm" data-e="${u._id}"><i class="fa-solid fa-user-lock"></i> Phân quyền / Sửa</button>
-        <button class="sm sec" data-t="${u._id}"><i class="fa-solid ${u.active ? 'fa-lock' : 'fa-lock-open'}"></i> ${u.active ? 'Khóa' : 'Mở khóa'}</button>
-        <button class="sm sec" data-o="${u._id}"><i class="fa-solid fa-right-from-bracket"></i> Buộc xuất</button>
-        <button class="sm sec" data-x="${u._id}"><i class="fa-solid fa-trash"></i> Xóa</button>
+        <button class="sm info" data-e="${u._id}"><i class="fa-solid fa-circle-info"></i> Chi tiết</button>
+        <button class="sm sec hide-mobile" data-t="${u._id}"><i class="fa-solid ${u.active ? 'fa-lock' : 'fa-lock-open'}"></i> ${u.active ? 'Khóa' : 'Mở khóa'}</button>
+        <button class="sm sec hide-mobile" data-o="${u._id}"><i class="fa-solid fa-right-from-bracket"></i> Buộc xuất</button>
+        <button class="sm sec hide-mobile" data-x="${u._id}"><i class="fa-solid fa-trash"></i> Xóa</button>
       </td>
     </tr>`).join('')}
     </tbody>
@@ -429,7 +435,13 @@ async function users() {
   const form = (u) => {
     const initRole = u?.role || 'canbo';
     const initPerms = { ...(ROLE_DEFAULTS[initRole] || ROLE_DEFAULTS.canbo), ...(u?.permissions || {}) };
-    modal(`<h3>${u ? `<i class="fa-solid fa-user-lock"></i> Phân quyền &amp; Sửa tài khoản: ${esc(u.username)}` : '<i class="fa-solid fa-user-plus"></i> Cấp tài khoản mới &amp; Phân quyền'}</h3>
+    modal(`<h3>${u ? `<i class="fa-solid fa-user-lock"></i> Chi tiết &amp; Phân quyền tài khoản` : '<i class="fa-solid fa-user-plus"></i> Cấp tài khoản mới &amp; Phân quyền'}</h3>
+    ${u ? `<div class="detail-grid" style="margin-bottom:14px">
+      <div class="detail-item"><span>Họ và tên</span><b>${esc(u.hoTen)}</b></div>
+      <div class="detail-item"><span>Tên đăng nhập</span><b>${esc(u.username)}</b></div>
+      <div class="detail-item"><span>Số cơ sở phụ trách</span><b>${u.soCoSo || 0} cơ sở</b></div>
+      <div class="detail-item"><span>Trạng thái &amp; Đăng nhập cuối</span><b>${u.active ? 'Hoạt động' : 'Đã khóa'} (${u.lastLogin ? new Date(u.lastLogin).toLocaleString('vi-VN') : 'Chưa đăng nhập'})</b></div>
+    </div>` : ''}
     <div class="grid">
       ${u ? '' : '<div><label>Tên đăng nhập *</label><input id="u_name" type="text" autocomplete="off" placeholder="vd: tuannghia"></div>'}
       <div><label>Họ và tên *</label><input id="u_ht" type="text" autocomplete="off" value="${esc(u?.hoTen || '')}" placeholder="Nhập họ tên cán bộ..."></div>
@@ -444,7 +456,7 @@ async function users() {
         <input id="u_pw" type="text" autocomplete="off" placeholder="${u ? 'Nhập mật khẩu mới nếu muốn đổi...' : 'Nhập mật khẩu ≥ 6 ký tự...'}">
       </div>
       <div class="full">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:6px">
           <label style="margin:0;font-size:13px;color:var(--red-800)"><i class="fa-solid fa-sliders"></i> Phân quyền chức năng chi tiết (Có thể bật/tắt tùy ý cho từng tài khoản)</label>
           <button type="button" class="sm sec" id="u_reset_perm"><i class="fa-solid fa-rotate-left"></i> Đặt lại theo mẫu vai trò</button>
         </div>
@@ -463,7 +475,13 @@ async function users() {
         </div>
       </div>
     </div>
-    <p style="margin-top:16px"><button id="save"><i class="fa-solid fa-floppy-disk"></i> Lưu tài khoản &amp; Phân quyền</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
+    <p style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+      <button id="save"><i class="fa-solid fa-floppy-disk"></i> Lưu &amp; Phân quyền</button>
+      ${u ? `<button type="button" class="sec" id="m_toggle"><i class="fa-solid ${u.active ? 'fa-lock' : 'fa-lock-open'}"></i> ${u.active ? 'Khóa TK' : 'Mở khóa TK'}</button>
+      <button type="button" class="sec" id="m_logout"><i class="fa-solid fa-right-from-bracket"></i> Buộc xuất</button>
+      <button type="button" class="sec" id="m_del"><i class="fa-solid fa-trash"></i> Xóa TK</button>` : ''}
+      <button class="sec" onclick="closeModal()">Đóng</button>
+    </p>`);
 
     const applyRolePreset = (role) => {
       const preset = ROLE_DEFAULTS[role] || ROLE_DEFAULTS.canbo;
@@ -473,6 +491,11 @@ async function users() {
     };
     $('#u_role').onchange = (e) => applyRolePreset(e.target.value);
     $('#u_reset_perm').onclick = () => applyRolePreset($('#u_role').value);
+    if (u) {
+      $('#m_toggle').onclick = safe(async () => { await api('/admin/users/' + u._id, 'PUT', { active: !u.active }); closeModal(); users(); });
+      $('#m_logout').onclick = safe(async () => { await api(`/admin/users/${u._id}/logout`, 'POST'); alert('Đã buộc đăng xuất'); });
+      $('#m_del').onclick = safe(async () => { if (confirm('Xóa tài khoản này?')) { await api('/admin/users/' + u._id, 'DELETE'); closeModal(); users(); } });
+    }
 
     $('#save').onclick = safe(async () => {
       const permissions = {};
@@ -505,8 +528,8 @@ async function users() {
 async function logs() {
   const list = await api('/admin/logs');
   app.innerHTML = `<div class="page-head"><div><h2><i class="fa-solid fa-clock-rotate-left"></i> Nhật ký đăng nhập</h2><p class="sub-note">200 lượt truy cập gần nhất</p></div></div>
-  <div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Tài khoản</th><th>Địa chỉ IP</th><th>Kết quả</th></tr></thead><tbody>
-  ${list.map((l) => `<tr><td>${new Date(l.at).toLocaleString('vi-VN')}</td><td><b>${esc(l.username)}</b></td><td>${esc(l.ip)}</td>
+  <div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Tài khoản</th><th class="hide-mobile">Địa chỉ IP</th><th>Kết quả</th></tr></thead><tbody>
+  ${list.map((l) => `<tr><td>${new Date(l.at).toLocaleString('vi-VN')}</td><td><b>${esc(l.username)}</b><span class="only-mobile" style="display:block;font-size:11px;color:#64748b">${esc(l.ip)}</span></td><td class="hide-mobile">${esc(l.ip)}</td>
   <td><span class="tag ${l.ok ? 'green' : 'red'}">${l.ok ? 'Thành công' : esc(l.note || 'Thất bại')}</span></td></tr>`).join('')}</tbody></table></div>`;
 }
 
@@ -607,25 +630,25 @@ async function facilities() {
     <thead><tr>
       <th>Tên cơ sở &amp; Hồ sơ</th>
       <th>Địa chỉ</th>
-      <th>Thuộc lĩnh vực</th>
-      <th>Loại hình cơ sở</th>
-      <th>Quy mô</th>
-      <th>Cán bộ phụ trách</th>
+      <th class="hide-mobile">Thuộc lĩnh vực</th>
+      <th class="hide-mobile">Loại hình cơ sở</th>
+      <th class="hide-mobile">Quy mô</th>
+      <th class="hide-mobile">Cán bộ phụ trách</th>
       <th>Thao tác</th>
     </tr></thead>
     <tbody>
     ${d.items.map((f) => `<tr>
         <td><b>${esc(f.ten)}</b><br><small style="color:#64748b">${esc(f.soHoSo || f.soTaiKhoan || '')}</small> ${f.trangThai === 'giam' ? '<span class="tag red">Đã giảm</span>' : ''}</td>
         <td>${esc([f.soNha, f.khuPho, f.phuong].filter(Boolean).join(', '))}</td>
-        <td>${renderLvBadge(f.linhVuc)}</td>
-        <td>${esc(f.loaiHinh || '—')}</td>
-        <td style="white-space:nowrap">${f.soTang ? `${f.soTang} tầng` : ''}${f.soTangHam ? ` (${f.soTangHam} hầm)` : ''}<br><small style="color:#64748b">${f.dienTichSan ? `${f.dienTichSan} m² sàn` : (f.dienTichMatBang ? `${f.dienTichMatBang} m² MB` : '')}</small></td>
-        <td><span class="tag blue"><i class="fa-solid fa-user-tie"></i> ${esc(f.canBoHoTen || f.canBoUsername || '—')}</span></td>
+        <td class="hide-mobile">${renderLvBadge(f.linhVuc)}</td>
+        <td class="hide-mobile">${esc(f.loaiHinh || '—')}</td>
+        <td class="hide-mobile" style="white-space:nowrap">${f.soTang ? `${f.soTang} tầng` : ''}${f.soTangHam ? ` (${f.soTangHam} hầm)` : ''}<br><small style="color:#64748b">${f.dienTichSan ? `${f.dienTichSan} m² sàn` : (f.dienTichMatBang ? `${f.dienTichMatBang} m² MB` : '')}</small></td>
+        <td class="hide-mobile"><span class="tag blue"><i class="fa-solid fa-user-tie"></i> ${esc(f.canBoHoTen || f.canBoUsername || '—')}</span></td>
         <td style="white-space:nowrap">
           <button class="sm info" data-view="${f._id}"><i class="fa-solid fa-circle-info"></i> Chi tiết</button>
-          ${canManage ? `<button class="sm" data-edit="${f._id}"><i class="fa-solid fa-pen-to-square"></i> Sửa</button>` : ''}
-          ${canInspect ? `<a class="btn sm amber" href="#/new-inspection/${f._id}"><i class="fa-solid fa-clipboard-check"></i> Kiểm tra</a>` : ''}
-          ${canManage ? `<button class="sm sec" data-del="${f._id}"><i class="fa-solid fa-trash"></i> Xóa</button>` : ''}
+          ${canManage ? `<button class="sm hide-mobile" data-edit="${f._id}"><i class="fa-solid fa-pen-to-square"></i> Sửa</button>` : ''}
+          ${canInspect ? `<a class="btn sm amber hide-mobile" href="#/new-inspection/${f._id}"><i class="fa-solid fa-clipboard-check"></i> Kiểm tra</a>` : ''}
+          ${canManage ? `<button class="sm sec hide-mobile" data-del="${f._id}"><i class="fa-solid fa-trash"></i> Xóa</button>` : ''}
         </td>
       </tr>`).join('')}
     </tbody>
@@ -711,9 +734,17 @@ function viewFacility(f) {
     <p style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
       ${hasPerm('manageFacilities') ? `<button id="v_edit"><i class="fa-solid fa-pen-to-square"></i> Sửa thông tin</button>` : ''}
       ${hasPerm('manageInspections') ? `<a class="btn amber" href="#/new-inspection/${f._id}" onclick="closeModal()"><i class="fa-solid fa-clipboard-check"></i> Lập biên bản kiểm tra</a>` : ''}
+      ${hasPerm('manageFacilities') ? `<button class="sec" id="v_del"><i class="fa-solid fa-trash"></i> Xóa cơ sở</button>` : ''}
       <button class="sec" onclick="closeModal()">Đóng</button>
     </p>`);
   if ($('#v_edit')) $('#v_edit').onclick = () => editFacility(f);
+  if ($('#v_del')) $('#v_del').onclick = safe(async () => {
+    if (confirm('Xóa cơ sở này?')) {
+      await api('/facilities/' + f._id, 'DELETE');
+      closeModal();
+      facilities();
+    }
+  });
 }
 
 function editFacility(f) {
@@ -747,12 +778,12 @@ async function wards() {
   </div>
   <div class="table-wrap"><table>
     <thead><tr>
-      <th style="width:60px">STT</th>
+      <th class="hide-mobile" style="width:60px">STT</th>
       <th>Tên Phường</th>
       <th>Số cơ sở đang hoạt động</th>
-      <th>Số cơ sở đã giảm</th>
-      <th>Tỷ lệ phân bố</th>
-      <th>Phân bố theo Lĩnh vực PCCC</th>
+      <th class="hide-mobile">Số cơ sở đã giảm</th>
+      <th class="hide-mobile">Tỷ lệ phân bố</th>
+      <th class="hide-mobile">Phân bố theo Lĩnh vực PCCC</th>
       <th>Thao tác</th>
     </tr></thead>
     <tbody>
@@ -760,21 +791,54 @@ async function wards() {
         const pct = totalActive ? ((w.soCoSo / totalActive) * 100).toFixed(1) : '0.0';
         const fieldBadges = (w.byField || []).map((f) => `<span class="tag gold" title="${esc(LINH_VUC_MAP[f.linhVuc] || '')}">Lĩnh vực ${esc(f.linhVuc)}: <b>${f.count}</b></span>`).join(' ');
         return `<tr>
-          <td style="font-weight:700;color:#64748b">${idx + 1}</td>
+          <td class="hide-mobile" style="font-weight:700;color:#64748b">${idx + 1}</td>
           <td><b style="font-size:15px;color:var(--red-800)"><i class="fa-solid fa-location-dot"></i> ${esc(w.ten)}</b><br><small style="color:#64748b">${esc(w.moTa || '')}</small></td>
           <td><span class="tag ${w.soCoSo ? 'green' : ''}">${w.soCoSo || 0} cơ sở</span></td>
-          <td><span class="tag ${w.soGiam ? 'red' : ''}">${w.soGiam || 0}</span></td>
-          <td><b>${pct}%</b></td>
-          <td><div class="perm-pills">${fieldBadges || '<span style="color:#94a3b8">Chưa có cơ sở</span>'}</div></td>
+          <td class="hide-mobile"><span class="tag ${w.soGiam ? 'red' : ''}">${w.soGiam || 0}</span></td>
+          <td class="hide-mobile"><b>${pct}%</b></td>
+          <td class="hide-mobile"><div class="perm-pills">${fieldBadges || '<span style="color:#94a3b8">Chưa có cơ sở</span>'}</div></td>
           <td style="white-space:nowrap">
-            <button class="sm info" data-go-ward="${esc(w.ten)}"><i class="fa-solid fa-magnifying-glass"></i> Lọc cơ sở</button>
-            ${hasPerm('manageFacilities') ? `<button class="sm ok" data-add-ward="${esc(w.ten)}"><i class="fa-solid fa-plus"></i> Thêm CS tại đây</button>` : ''}
+            <button class="sm info only-mobile" data-view-ward="${esc(w.ten)}"><i class="fa-solid fa-circle-info"></i> Chi tiết</button>
+            <button class="sm info hide-mobile" data-go-ward="${esc(w.ten)}"><i class="fa-solid fa-magnifying-glass"></i> Lọc cơ sở</button>
+            ${hasPerm('manageFacilities') ? `<button class="sm ok hide-mobile" data-add-ward="${esc(w.ten)}"><i class="fa-solid fa-plus"></i> Thêm CS tại đây</button>` : ''}
           </td>
         </tr>`;
       }).join('')}
     </tbody>
   </table></div>`;
 
+  const openAddWard = (wardName) => {
+    modal(`<h3><i class="fa-solid fa-plus"></i> Thêm cơ sở PCCC tại ${esc(wardName)}</h3>${facilityForm({ phuong: wardName }, 'f')}<p style="margin-top:16px"><button id="save"><i class="fa-solid fa-floppy-disk"></i> Lưu thông tin</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
+    bindFacilityFormEvents('f');
+    $('#save').onclick = safe(async () => {
+      await api('/facilities', 'POST', readForm('f'));
+      closeModal(); wards();
+    });
+  };
+  app.querySelectorAll('[data-view-ward]').forEach((b) => {
+    b.onclick = () => {
+      const w = list.find((x) => x.ten === b.dataset.viewWard);
+      if (!w) return;
+      const pct = totalActive ? ((w.soCoSo / totalActive) * 100).toFixed(1) : '0.0';
+      const fieldBadges = (w.byField || []).map((f) => `<span class="tag gold">Lĩnh vực ${esc(f.linhVuc)} (${esc(LINH_VUC_MAP[f.linhVuc] || '')}): <b>${f.count}</b></span>`).join(' ');
+      modal(`<h3><i class="fa-solid fa-location-dot"></i> Chi tiết địa bàn ${esc(w.ten)}</h3>
+        <div class="detail-grid">
+          <div class="detail-item"><span>Tên Phường</span><b>${esc(w.ten)}</b></div>
+          <div class="detail-item"><span>Tỷ lệ phân bố</span><b>${pct}% tổng số cơ sở</b></div>
+          <div class="detail-item"><span>Cơ sở đang hoạt động</span><b>${w.soCoSo || 0} cơ sở</b></div>
+          <div class="detail-item"><span>Cơ sở đã giảm</span><b>${w.soGiam || 0} cơ sở</b></div>
+          <div class="detail-item full"><span>Mô tả địa bàn</span><b>${esc(w.moTa || '—')}</b></div>
+          <div class="detail-item full"><span>Phân bố theo Lĩnh vực PCCC</span><div class="perm-pills" style="margin-top:4px">${fieldBadges || 'Chưa có cơ sở'}</div></div>
+        </div>
+        <p style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="info" id="w_go"><i class="fa-solid fa-magnifying-glass"></i> Lọc cơ sở thuộc phường này</button>
+          ${hasPerm('manageFacilities') ? `<button class="ok" id="w_add"><i class="fa-solid fa-plus"></i> Thêm cơ sở tại đây</button>` : ''}
+          <button class="sec" onclick="closeModal()">Đóng</button>
+        </p>`);
+      $('#w_go').onclick = () => { closeModal(); fq = { ...fq, phuong: w.ten, page: 1 }; location.hash = '#/facilities'; };
+      if ($('#w_add')) $('#w_add').onclick = () => openAddWard(w.ten);
+    };
+  });
   app.querySelectorAll('[data-go-ward]').forEach((b) => {
     b.onclick = () => {
       fq = { ...fq, phuong: b.dataset.goWard, page: 1 };
@@ -782,14 +846,7 @@ async function wards() {
     };
   });
   app.querySelectorAll('[data-add-ward]').forEach((b) => {
-    b.onclick = () => {
-      modal(`<h3><i class="fa-solid fa-plus"></i> Thêm cơ sở PCCC tại ${esc(b.dataset.addWard)}</h3>${facilityForm({ phuong: b.dataset.addWard }, 'f')}<p style="margin-top:16px"><button id="save"><i class="fa-solid fa-floppy-disk"></i> Lưu thông tin</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
-      bindFacilityFormEvents('f');
-      $('#save').onclick = safe(async () => {
-        await api('/facilities', 'POST', readForm('f'));
-        closeModal(); wards();
-      });
-    };
+    b.onclick = () => openAddWard(b.dataset.addWard);
   });
 }
 
@@ -824,21 +881,24 @@ async function types() {
       <div class="lv-group-body">
         <table>
           <thead><tr>
-            <th style="width:60px">STT</th>
+            <th class="hide-mobile" style="width:60px">STT</th>
             <th>Tên loại hình cơ sở riêng</th>
-            <th style="width:150px">Thuộc lĩnh vực</th>
+            <th class="hide-mobile" style="width:150px">Thuộc lĩnh vực</th>
             <th style="width:110px">Số cơ sở</th>
-            <th style="width:130px">Chu kỳ KT</th>
-            ${canEditTypes ? '<th style="width:120px">Thao tác</th>' : ''}
+            <th class="hide-mobile" style="width:130px">Chu kỳ KT</th>
+            <th style="width:120px">Thao tác</th>
           </tr></thead>
           <tbody>
             ${items.map((t, idx) => `<tr>
-              <td style="color:#64748b;font-weight:600">${idx + 1}</td>
+              <td class="hide-mobile" style="color:#64748b;font-weight:600">${idx + 1}</td>
               <td><b>${esc(t.ten)}</b>${t.moTa ? `<br><small style="color:#64748b">${esc(t.moTa)}</small>` : ''}</td>
-              <td><span class="lv-badge">Lĩnh vực ${id}</span></td>
+              <td class="hide-mobile"><span class="lv-badge">Lĩnh vực ${id}</span></td>
               <td>${t.soCoSo ? `<span class="tag green">${t.soCoSo} cơ sở</span>` : '<span style="color:#94a3b8">0</span>'}</td>
-              <td>${t.chuKyKiemTraThang ? `${esc(t.chuKyKiemTraThang)} tháng` : '—'}</td>
-              ${canEditTypes ? `<td style="white-space:nowrap"><button class="sm" data-e="${t._id}"><i class="fa-solid fa-pen-to-square"></i> Sửa</button> <button class="sm sec" data-d="${t._id}"><i class="fa-solid fa-trash"></i> Xóa</button></td>` : ''}
+              <td class="hide-mobile">${t.chuKyKiemTraThang ? `${esc(t.chuKyKiemTraThang)} tháng` : '—'}</td>
+              <td style="white-space:nowrap">
+                <button class="sm info only-mobile" data-vt="${t._id}"><i class="fa-solid fa-circle-info"></i> Chi tiết</button>
+                ${canEditTypes ? `<button class="sm hide-mobile" data-e="${t._id}"><i class="fa-solid fa-pen-to-square"></i> Sửa</button> <button class="sm sec hide-mobile" data-d="${t._id}"><i class="fa-solid fa-trash"></i> Xóa</button>` : '<span class="hide-mobile" style="color:#94a3b8">—</span>'}
+              </td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -894,6 +954,29 @@ async function types() {
     });
   };
   if ($('#add')) $('#add').onclick = () => form();
+  app.querySelectorAll('[data-vt]').forEach((b) => {
+    b.onclick = () => {
+      const t = TYPES.find((x) => x._id === b.dataset.vt);
+      if (!t) return;
+      const lvId = parentLvId(t.linhVuc) || '1';
+      modal(`<h3><i class="fa-solid fa-layer-group"></i> Chi tiết loại hình cơ sở</h3>
+        <div class="detail-grid">
+          <div class="detail-item full"><span>Tên loại hình</span><b>${esc(t.ten)}</b></div>
+          <div class="detail-item full"><span>Thuộc lĩnh vực</span><b>Lĩnh vực ${lvId} — ${esc(LINH_VUC_MAP[lvId] || '')}</b></div>
+          <div class="detail-item"><span>Số cơ sở hiện có</span><b>${t.soCoSo || 0} cơ sở</b></div>
+          <div class="detail-item"><span>Chu kỳ kiểm tra</span><b>${t.chuKyKiemTraThang ? `${esc(t.chuKyKiemTraThang)} tháng` : '—'}</b></div>
+          <div class="detail-item full"><span>Ghi chú / Mô tả</span><b>${esc(t.moTa || '—')}</b></div>
+        </div>
+        <p style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="info" id="vt_go"><i class="fa-solid fa-magnifying-glass"></i> Xem danh sách cơ sở thuộc loại hình này</button>
+          ${canEditTypes ? `<button id="vt_edit"><i class="fa-solid fa-pen-to-square"></i> Sửa</button> <button class="sec" id="vt_del"><i class="fa-solid fa-trash"></i> Xóa</button>` : ''}
+          <button class="sec" onclick="closeModal()">Đóng</button>
+        </p>`);
+      $('#vt_go').onclick = () => { closeModal(); fq = { ...fq, linhVuc: lvId, loaiHinh: t.ten, page: 1 }; location.hash = '#/facilities'; };
+      if ($('#vt_edit')) $('#vt_edit').onclick = () => form(t);
+      if ($('#vt_del')) $('#vt_del').onclick = safe(async () => { if (confirm('Xóa loại hình này?')) { await api('/types/' + t._id, 'DELETE'); closeModal(); route(); } });
+    };
+  });
   app.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => form(TYPES.find((t) => t._id === b.dataset.e))));
   app.querySelectorAll('[data-d]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Xóa loại hình này?')) { await api('/types/' + b.dataset.d, 'DELETE'); route(); } })));
 }
@@ -911,16 +994,16 @@ async function inspections() {
   const [list, facs] = await Promise.all([api('/inspections'), api('/facilities?limit=500&trangThai=all')]);
   const name = Object.fromEntries(facs.items.map((f) => [f._id, f.ten]));
   app.innerHTML = `<div class="page-head"><div><h2><i class="fa-solid fa-clipboard-check"></i> Biên bản kiểm tra an toàn PCCC</h2><p class="sub-note">Chọn cơ sở bên trang <a href="#/facilities">Danh sách cơ sở</a> → bấm nút <b>Kiểm tra</b> để lập biên bản mới</p></div></div>
-  <div class="table-wrap"><table><thead><tr><th>Số biên bản</th><th>Ngày kiểm tra</th><th>Tên cơ sở</th><th>Cán bộ phụ trách</th><th>Kết luận</th><th>Thao tác</th></tr></thead><tbody>
+  <div class="table-wrap"><table><thead><tr><th class="hide-mobile">Số biên bản</th><th class="hide-mobile">Ngày kiểm tra</th><th>Tên cơ sở</th><th class="hide-mobile">Cán bộ phụ trách</th><th>Kết luận</th><th>Thao tác</th></tr></thead><tbody>
   ${list.map((i) => `<tr>
-    <td><b>${esc(i.soBienBan)}</b></td>
-    <td>${esc(i.ngayKiemTra)}</td>
-    <td>${esc(name[i.facilityId] || '(đã xóa)')}</td>
-    <td><span class="tag blue"><i class="fa-solid fa-user-tie"></i> ${esc(i.canBoHoTen || i.canBoUsername || '—')}</span></td>
+    <td class="hide-mobile"><b>${esc(i.soBienBan)}</b></td>
+    <td class="hide-mobile">${esc(i.ngayKiemTra)}</td>
+    <td><b>${esc(name[i.facilityId] || '(đã xóa)')}</b><span class="only-mobile" style="display:block;font-size:11.5px;color:#64748b">${esc(i.soBienBan)} • ${esc(i.ngayKiemTra || '')}</span></td>
+    <td class="hide-mobile"><span class="tag blue"><i class="fa-solid fa-user-tie"></i> ${esc(i.canBoHoTen || i.canBoUsername || '—')}</span></td>
     <td><span class="tag ${i.ketLuan === 'Đạt' ? 'green' : 'red'}">${esc(i.ketLuan)}</span></td>
-    <td>
-      <a class="btn sm" href="#/inspection/${i._id}"><i class="fa-solid fa-print"></i> Xem / In</a>
-      ${canInspect ? `<button class="sm sec" data-d="${i._id}"><i class="fa-solid fa-trash"></i> Xóa</button>` : ''}
+    <td style="white-space:nowrap">
+      <a class="btn sm info" href="#/inspection/${i._id}"><i class="fa-solid fa-circle-info"></i> Chi tiết</a>
+      ${canInspect ? `<button class="sm sec hide-mobile" data-d="${i._id}"><i class="fa-solid fa-trash"></i> Xóa</button>` : ''}
     </td>
   </tr>`).join('')}</tbody></table></div>`;
   app.querySelectorAll('[data-d]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Xóa biên bản?')) { await api('/inspections/' + b.dataset.d, 'DELETE'); inspections(); } })));
@@ -951,7 +1034,11 @@ async function inspectionForm(fid) {
 const vnDate = (s) => (s ? s.split('-').reverse().join('/') : '...');
 async function inspectionPrint(id) {
   const i = await api('/inspections/' + id), f = i.facility || {};
-  app.innerHTML = `<div class="noprint bar"><button onclick="print()"><i class="fa-solid fa-print"></i> In biên bản</button><a class="btn sec" href="#/inspections"><i class="fa-solid fa-arrow-left"></i> Quay lại</a></div>
+  app.innerHTML = `<div class="noprint bar">
+    <button onclick="print()"><i class="fa-solid fa-print"></i> In biên bản</button>
+    ${hasPerm('manageInspections') ? `<button class="sec" id="del_insp"><i class="fa-solid fa-trash"></i> Xóa biên bản</button>` : ''}
+    <a class="btn sec" href="#/inspections"><i class="fa-solid fa-arrow-left"></i> Quay lại</a>
+  </div>
   <div class="paper"><p class="c"><b>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br>Độc lập - Tự do - Hạnh phúc</p>
   <h3>Biên bản kiểm tra an toàn về phòng cháy và chữa cháy<br><small>Số: ${esc(i.soBienBan)}</small></h3>
   <p>Hôm nay, ngày ${vnDate(i.ngayKiemTra)}, đoàn kiểm tra (${esc(i.doanKiemTra) || '...'}) đã tiến hành kiểm tra (${esc(i.loaiKiemTra)}) đối với:</p>
@@ -961,6 +1048,12 @@ async function inspectionPrint(id) {
   <p><b>Kiến nghị:</b><br>${esc(i.kienNghi || 'Không').replace(/\n/g, '<br>')}<br>Hạn khắc phục: ${vnDate(i.hanKhacPhuc)}</p>
   <p><b>Kết luận:</b> ${esc(i.ketLuan)}</p>
   <table style="border:0"><tr style="text-align:center"><td style="border:0"><b>ĐẠI DIỆN CƠ SỞ</b><br><br><br><br></td><td style="border:0"><b>ĐOÀN KIỂM TRA</b><br><br><br><br></td></tr></table></div>`;
+  if ($('#del_insp')) $('#del_insp').onclick = safe(async () => {
+    if (confirm('Xóa biên bản kiểm tra này?')) {
+      await api('/inspections/' + id, 'DELETE');
+      location.hash = '#/inspections';
+    }
+  });
 }
 
 /* ---------- Tăng / giảm ---------- */
@@ -991,17 +1084,18 @@ async function changes() {
   const row = (c) => `<tr>
     <td><b>${esc(c.snapshot?.ten)}</b></td>
     <td>${esc([c.snapshot?.soNha, c.snapshot?.khuPho, c.snapshot?.phuong].filter(Boolean).join(', '))}</td>
-    <td>${renderLvBadge(c.snapshot?.linhVuc)}</td>
-    <td>${esc(c.snapshot?.loaiHinh)}</td>
-    <td><span class="tag blue"><i class="fa-solid fa-user-tie"></i> ${esc(c.canBoHoTen || c.canBoUsername || '—')}</span></td>
-    <td>${esc(c.lyDo)}</td>
+    <td class="hide-mobile">${renderLvBadge(c.snapshot?.linhVuc)}</td>
+    <td class="hide-mobile">${esc(c.snapshot?.loaiHinh)}</td>
+    <td class="hide-mobile"><span class="tag blue"><i class="fa-solid fa-user-tie"></i> ${esc(c.canBoHoTen || c.canBoUsername || '—')}</span></td>
+    <td class="hide-mobile">${esc(c.lyDo)}</td>
     <td class="noprint" style="white-space:nowrap">
-      ${canChange ? `<button class="sm" data-ech="${c._id}"><i class="fa-solid fa-pen-to-square"></i> Sửa</button> <button class="sm sec" data-d="${c._id}"><i class="fa-solid fa-rotate-left"></i> Xóa / Hoàn tác</button>` : ''}
+      <button class="sm info" data-vch="${c._id}"><i class="fa-solid fa-circle-info"></i> Chi tiết</button>
+      ${canChange ? `<button class="sm hide-mobile" data-ech="${c._id}"><i class="fa-solid fa-pen-to-square"></i> Sửa</button> <button class="sm sec hide-mobile" data-d="${c._id}"><i class="fa-solid fa-rotate-left"></i> Xóa / Hoàn tác</button>` : ''}
     </td>
   </tr>`;
   const sect = (loai, title) => {
     const l = list.filter((c) => c.loai === loai);
-    return `<h3>${title} (${l.length})</h3><div class="table-wrap"><table><thead><tr><th>Tên cơ sở</th><th>Địa chỉ</th><th>Thuộc lĩnh vực</th><th>Loại hình</th><th>Cán bộ phụ trách</th><th>Ghi chú / lý do</th><th class="noprint">Thao tác</th></tr></thead><tbody>${l.map(row).join('')}</tbody></table></div>`;
+    return `<h3>${title} (${l.length})</h3><div class="table-wrap"><table><thead><tr><th>Tên cơ sở</th><th>Địa chỉ</th><th class="hide-mobile">Thuộc lĩnh vực</th><th class="hide-mobile">Loại hình</th><th class="hide-mobile">Cán bộ phụ trách</th><th class="hide-mobile">Ghi chú / lý do</th><th class="noprint">Thao tác</th></tr></thead><tbody>${l.map(row).join('')}</tbody></table></div>`;
   };
   app.innerHTML = `<div class="page-head"><div><h2><i class="fa-solid fa-arrow-trend-up"></i> Danh sách tăng, giảm cơ sở ${vnMonthLabel(chThang)}</h2><p class="sub-note">Theo dõi biến động cơ sở PCCC hàng tháng</p></div></div>
   <div class="bar noprint">
@@ -1014,26 +1108,55 @@ async function changes() {
   const onMonthChange = () => { chThang = readMonthYear('th'); changes(); };
   $('#th_m').onchange = onMonthChange;
   $('#th_y').onchange = onMonthChange;
-  app.querySelectorAll('[data-ech]').forEach((b) => {
+  const openEditChange = (c) => {
+    if (!c) return;
+    modal(`<h3><i class="fa-solid fa-pen-to-square"></i> Sửa phiếu ${c.loai === 'tang' ? 'Tăng' : 'Giảm'} cơ sở</h3>
+      <div class="grid">
+        <div class="full"><label>Tên cơ sở</label><input id="ec_ten" type="text" autocomplete="off" value="${esc(c.snapshot?.ten || '')}"></div>
+        <div><label>Tháng biến động</label>${renderMonthYearSelect('ec_thang', c.thang)}</div>
+        <div><label>Ghi chú / Lý do</label><input id="ec_lydo" type="text" autocomplete="off" value="${esc(c.lyDo || '')}"></div>
+      </div>
+      <p style="margin-top:16px"><button id="save"><i class="fa-solid fa-floppy-disk"></i> Lưu thay đổi</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
+    $('#save').onclick = safe(async () => {
+      await api('/changes/' + c._id, 'PUT', {
+        ten: $('#ec_ten').value.trim(),
+        thang: readMonthYear('ec_thang'),
+        lyDo: $('#ec_lydo').value.trim(),
+      });
+      closeModal(); changes();
+    });
+  };
+  app.querySelectorAll('[data-vch]').forEach((b) => {
     b.onclick = () => {
-      const c = list.find((x) => x._id === b.dataset.ech);
+      const c = list.find((x) => x._id === b.dataset.vch);
       if (!c) return;
-      modal(`<h3><i class="fa-solid fa-pen-to-square"></i> Sửa phiếu ${c.loai === 'tang' ? 'Tăng' : 'Giảm'} cơ sở</h3>
-        <div class="grid">
-          <div class="full"><label>Tên cơ sở</label><input id="ec_ten" type="text" autocomplete="off" value="${esc(c.snapshot?.ten || '')}"></div>
-          <div><label>Tháng biến động</label>${renderMonthYearSelect('ec_thang', c.thang)}</div>
-          <div><label>Ghi chú / Lý do</label><input id="ec_lydo" type="text" autocomplete="off" value="${esc(c.lyDo || '')}"></div>
+      const lvId = parentLvId(c.snapshot?.linhVuc);
+      modal(`<h3><i class="fa-solid fa-circle-info"></i> Chi tiết phiếu ${c.loai === 'tang' ? 'Tăng' : 'Giảm'} cơ sở</h3>
+        <div class="detail-grid">
+          <div class="detail-item full"><span>Tên cơ sở</span><b>${esc(c.snapshot?.ten || '—')}</b></div>
+          <div class="detail-item full"><span>Địa chỉ</span><b>${esc([c.snapshot?.soNha, c.snapshot?.khuPho, c.snapshot?.phuong].filter(Boolean).join(', ') || '—')}</b></div>
+          <div class="detail-item"><span>Loại biến động</span><b>${c.loai === 'tang' ? 'Tăng cơ sở' : 'Giảm cơ sở'} (${esc(vnMonthLabel(c.thang))})</b></div>
+          <div class="detail-item"><span>Cán bộ phụ trách</span><b>${esc(c.canBoHoTen || c.canBoUsername || '—')}</b></div>
+          <div class="detail-item full"><span>Thuộc lĩnh vực &amp; Loại hình</span><b>${lvId ? `Lĩnh vực ${lvId} — ` : ''}${esc(c.snapshot?.loaiHinh || '—')}</b></div>
+          <div class="detail-item full"><span>Ghi chú / Lý do</span><b>${esc(c.lyDo || '—')}</b></div>
         </div>
-        <p style="margin-top:16px"><button id="save"><i class="fa-solid fa-floppy-disk"></i> Lưu thay đổi</button> <button class="sec" onclick="closeModal()">Hủy</button></p>`);
-      $('#save').onclick = safe(async () => {
-        await api('/changes/' + c._id, 'PUT', {
-          ten: $('#ec_ten').value.trim(),
-          thang: readMonthYear('ec_thang'),
-          lyDo: $('#ec_lydo').value.trim(),
-        });
-        closeModal(); changes();
+        <p style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+          ${canChange ? `<button id="vc_edit"><i class="fa-solid fa-pen-to-square"></i> Sửa phiếu</button>
+          <button class="sec" id="vc_del"><i class="fa-solid fa-rotate-left"></i> Xóa / Hoàn tác</button>` : ''}
+          <button class="sec" onclick="closeModal()">Đóng</button>
+        </p>`);
+      if ($('#vc_edit')) $('#vc_edit').onclick = () => openEditChange(c);
+      if ($('#vc_del')) $('#vc_del').onclick = safe(async () => {
+        if (confirm('Xóa phiếu và hoàn tác trạng thái cơ sở?')) {
+          await api('/changes/' + c._id, 'DELETE');
+          closeModal();
+          changes();
+        }
       });
     };
+  });
+  app.querySelectorAll('[data-ech]').forEach((b) => {
+    b.onclick = () => openEditChange(list.find((x) => x._id === b.dataset.ech));
   });
   app.querySelectorAll('[data-d]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Xóa phiếu và hoàn tác trạng thái cơ sở?')) { await api('/changes/' + b.dataset.d, 'DELETE'); changes(); } })));
   if ($('#tang')) $('#tang').onclick = () => {
