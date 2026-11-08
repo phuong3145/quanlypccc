@@ -1,6 +1,8 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
+const XLSX = require('xlsx');
 const { getDb } = require('../lib/db');
+const DEFAULT_DON_VI = 'Đội CC và CNCH KV7';
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -29,6 +31,7 @@ const FAC_FIELDS = [
   'thangNamHoatDong', 'soTang', 'khoiTich', 'dienTichSan', 'thongTinDacThu', 'phanLoai',
   'thamDuyet', 'tinhTrangViPham', 'donViQuanLy', 'ghiChu', 'nguoiDaiDien', 'dienThoai',
   'soTangHam', 'dienTichMatBang', 'nhomLoaiHinh', 'canBoUsername',
+  'huongDanKhaiBao', 'camKetTruyenTin', 'daLapTruyenTin',
 ];
 const { GROUPS, LINH_VUC_MAP, STANDARD_WARDS, WARD_NAMES, normalizeWard, normalizeMonthYear, normalizeFacilityType } = require('../lib/catalog');
 const { getCache, setCache, clearCache } = require('../lib/cache');
@@ -46,6 +49,9 @@ app.use('/api', (req, res, next) => {
 
 function applyLinhVucFromType(d) {
   d.phuong = normalizeWard(d.phuong);
+  if (!d.donViQuanLy || !String(d.donViQuanLy).trim()) {
+    d.donViQuanLy = DEFAULT_DON_VI;
+  }
   if (d.thangNamHoatDong !== undefined) {
     d.thangNamHoatDong = normalizeMonthYear(d.thangNamHoatDong);
     if (d.thangNamHoatDong && !/^(0[1-9]|1[0-2])\/\d{4}$/.test(d.thangNamHoatDong)) {
@@ -233,6 +239,165 @@ app.get('/api/facilities', wrap(async (req, res) => {
   await setCache(cacheKey, result, 180);
   res.setHeader('X-Cache', 'MISS');
   res.json(result);
+}));
+
+app.get('/api/facilities/export', wrap(async (req, res) => {
+  const { q, loaiHinh, phuong, trangThai = 'hoatdong', linhVuc, canBo } = req.query;
+  const effectiveCanBo = req.user.perms.viewAllFacilities ? (canBo || '') : req.user.username;
+  const db = await getDb();
+  const f = {};
+  if (effectiveCanBo) f.canBoUsername = effectiveCanBo;
+  if (trangThai !== 'all') f.trangThai = trangThai;
+  if (loaiHinh) f.loaiHinh = loaiHinh;
+  if (phuong) f.phuong = phuong;
+  if (linhVuc) f.linhVuc = linhVuc;
+  if (q) {
+    const r = new RegExp(esc(q), 'i');
+    f.$or = [{ ten: r }, { soHoSo: r }, { soTaiKhoan: r }, { soNha: r }, { khuPho: r }];
+  }
+  const items = await db.collection('facilities').find(f).sort({ sttGoc: 1, ten: 1 }).toArray();
+
+  // Dòng 1: Trống (giống mẫu sheet Hào)
+  const row0 = Array(37).fill('');
+  // Dòng 2: Tiêu đề nhóm cha
+  const row1 = [
+    'STT',
+    'Số hồ sơ (1234/PC…../701CK)',
+    'Số tài khoản',
+    'Tên cơ\r\n sở',
+    'Địa chỉ', '', '',
+    'Thuộc lĩnh vực',
+    'Loại hình cơ sở (vd Nhà trọ, Văn phòng, cửa hàng…)',
+    'Tháng/Năm đưa vào hoạt động (T8/2025)',
+    'Quy mô', '', '', '',
+    'Phân loại theo Nghị định 105/2025/NĐ-CP', '', '', '', '',
+    'Việc thẩm duyệt (thẩm định), nghiệm thu về PCCC', '', '',
+    'Cơ sở không được xây dựng hoặc hoạt động đúng theo quy định (theo K7 Đ2 Luật PCCC&CNCH)', '', '', '',
+    'Cơ sở không đảm bảo an toàn PCCC hoạt động trước Luật PCCC năm 2001',
+    'Cơ sở tồn tại vi phạm không có khả năng khắc phục hoạt động trước Luật PCCC và CNCH (Trước 01/07/2025)',
+    'Đình chỉ hoạt động', '',
+    'Hệ thống cơ sở dữ liệu Quốc gia về PCCC và CNCH', '', '',
+    'Thông tin Đơn vị quản lý', '', '',
+    'Ghi chú',
+  ];
+  // Dòng 3: Tiêu đề cột con
+  const row2 = [
+    '', '', '', '',
+    'Số nhà, tên đường,…', 'khu phố, KCN, KCX,KCNC', 'Tên phường/xã',
+    '', '', '',
+    'Số tầng', 'Khối tích (m3)', 'Tổng diện tích sàn (m2)', 'Thông tin đặc thù khác (*)',
+    'Ngoài Phụ lục II', 'Nhóm 1 - Phụ lục II', 'Nhóm 2 - Phụ lục II', 'Phụ lục III', 'Phụ lục VII',
+    'Đã thẩm duyệt, nghiệm thu', 'Đã thẩm duyệt, chưa nghiệm thu', 'Chưa được thẩm duyệt, nghiệm thu',
+    'Tháng năm xây dựng', 'Vi phạm về xây dựng', 'Vi phạm về đăng ký kinh doanh', 'Vi phạm về PCCC',
+    '', '',
+    'Số quyết định (xxx/QĐ-…)', 'Ngày ban hành quyết định (dd/mm/yyyy)',
+    'Hướng dẫn khai báo, cập nhật thông tin cơ sở', 'Cam kết lắp đặt thiết bị truyền tin báo cháy', 'Đã lắp đặt thiết bị truyền tin báo cháy',
+    'Đơn vị quản lý', 'Tên cán bộ quản lý', 'Số điện thoại liên hệ',
+    '',
+  ];
+
+  const dataRows = items.map((x, idx) => {
+    const pl = String(x.phanLoai || '');
+    const td = String(x.thamDuyet || '');
+    const vp = String(x.tinhTrangViPham || '');
+    const soTangCell = x.soTangHam && x.soTang
+      ? `${String(x.soTangHam).padStart(2, '0')} tầng hầm và ${x.soTang} tầng nổi`
+      : (x.soTang ?? '');
+    return [
+      idx + 1,
+      x.soHoSo || '',
+      x.soTaiKhoan || '',
+      x.ten || '',
+      x.soNha || '',
+      x.khuPho || '',
+      x.phuong || '',
+      x.linhVuc ? (Number(x.linhVuc) || x.linhVuc) : '',
+      x.loaiHinh || '',
+      x.thangNamHoatDong || '',
+      soTangCell,
+      x.khoiTich ?? '',
+      x.dienTichSan ?? '',
+      x.thongTinDacThu || '',
+      /ngoài phụ lục ii/i.test(pl) ? 'X' : '',
+      /nh[oó]m 1/i.test(pl) ? 'X' : '',
+      /nh[oó]m 2/i.test(pl) ? 'X' : '',
+      /phụ lục iii/i.test(pl) ? 'X' : '',
+      /phụ lục vii/i.test(pl) ? 'X' : '',
+      /đã thẩm duyệt,\s*nghiệm thu/i.test(td) ? 'X' : '',
+      /đã thẩm duyệt,\s*chưa nghiệm thu/i.test(td) ? 'X' : '',
+      /chưa được thẩm duyệt/i.test(td) ? 'X' : '',
+      x.thangNamXayDung || '',
+      /xây dựng/i.test(vp) ? 'X' : '',
+      /đăng ký kinh doanh/i.test(vp) ? 'X' : '',
+      /pccc/i.test(vp) ? 'X' : '',
+      x.truocLuat2001 || '',
+      x.truocLuat2025 || '',
+      x.soQuyetDinhDinhChi || '',
+      x.ngayQuyetDinhDinhChi || '',
+      x.huongDanKhaiBao ? 'X' : '',
+      x.camKetTruyenTin ? 'X' : '',
+      x.daLapTruyenTin ? 'X' : '',
+      x.donViQuanLy || DEFAULT_DON_VI,
+      x.canBoHoTen || x.nguoiDaiDien || x.nguoiPhuTrach || '',
+      x.dienThoai || '',
+      x.ghiChu || '',
+    ];
+  });
+
+  // Dòng 4: Dòng đếm tổng (COUNTA) cho từng cột giống mẫu sheet Hào
+  const row3 = Array.from({ length: 37 }, (_, c) =>
+    dataRows.reduce((cnt, r) => (r[c] !== '' && r[c] !== null && r[c] !== undefined ? cnt + 1 : cnt), 0)
+  );
+
+  const ws = XLSX.utils.aoa_to_sheet([row0, row1, row2, row3, ...dataRows]);
+  const lastExcelRow = Math.max(5, dataRows.length + 4);
+  for (let c = 0; c < 37; c++) {
+    const colLetter = XLSX.utils.encode_col(c);
+    const cellRef = XLSX.utils.encode_cell({ r: 3, c });
+    ws[cellRef] = { t: 'n', v: row3[c], f: `COUNTA(${colLetter}5:${colLetter}${lastExcelRow})` };
+  }
+
+  ws['!merges'] = [
+    { s: { r: 1, c: 0 }, e: { r: 2, c: 0 } },
+    { s: { r: 1, c: 1 }, e: { r: 2, c: 1 } },
+    { s: { r: 1, c: 2 }, e: { r: 2, c: 2 } },
+    { s: { r: 1, c: 3 }, e: { r: 2, c: 3 } },
+    { s: { r: 1, c: 4 }, e: { r: 1, c: 6 } },
+    { s: { r: 1, c: 7 }, e: { r: 2, c: 7 } },
+    { s: { r: 1, c: 8 }, e: { r: 2, c: 8 } },
+    { s: { r: 1, c: 9 }, e: { r: 2, c: 9 } },
+    { s: { r: 1, c: 10 }, e: { r: 1, c: 13 } },
+    { s: { r: 1, c: 14 }, e: { r: 1, c: 18 } },
+    { s: { r: 1, c: 19 }, e: { r: 1, c: 21 } },
+    { s: { r: 1, c: 22 }, e: { r: 1, c: 25 } },
+    { s: { r: 1, c: 26 }, e: { r: 2, c: 26 } },
+    { s: { r: 1, c: 27 }, e: { r: 2, c: 27 } },
+    { s: { r: 1, c: 28 }, e: { r: 1, c: 29 } },
+    { s: { r: 1, c: 30 }, e: { r: 1, c: 32 } },
+    { s: { r: 1, c: 33 }, e: { r: 1, c: 35 } },
+    { s: { r: 1, c: 36 }, e: { r: 2, c: 36 } },
+  ];
+  ws['!cols'] = [
+    { wch: 6 }, { wch: 20 }, { wch: 16 }, { wch: 36 },
+    { wch: 26 }, { wch: 14 }, { wch: 18 }, { wch: 10 },
+    { wch: 28 }, { wch: 14 }, { wch: 22 }, { wch: 12 },
+    { wch: 14 }, { wch: 24 }, { wch: 12 }, { wch: 14 },
+    { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 16 },
+    { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+    { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 16 },
+    { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
+    { wch: 16 }, { wch: 22 }, { wch: 22 }, { wch: 15 },
+    { wch: 20 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Hào');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  const dateStr = new Date().toISOString().slice(0, 10).split('-').reverse().join('.');
+  const fileName = `KV7_DS_co_so_PCCC_${dateStr}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.send(buf);
 }));
 
 app.get('/api/facilities/:id', wrap(async (req, res) => {

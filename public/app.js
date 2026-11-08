@@ -183,7 +183,8 @@ function facilityForm(f = {}, prefix = 'f') {
   return `<div class="grid">` +
     ownerSelectHtml +
     FIELDS.map(([k, label, kind, opts]) => {
-      const id = `${prefix}_${k}`, v = esc(f[k] ?? '');
+      const rawVal = k === 'donViQuanLy' ? (f[k] || 'Đội CC và CNCH KV7') : (f[k] ?? '');
+      const id = `${prefix}_${k}`, v = esc(rawVal);
       let input;
       if (kind === 'type') {
         input = `<select id="${id}"><option value="">-- Chọn loại hình cơ sở --</option>${extraOpt}${groupedOptions}</select>`;
@@ -256,6 +257,7 @@ const formatMmYyyy = (raw) => {
 
 const readForm = (prefix = 'f') => {
   const obj = Object.fromEntries(FIELDS.map(([k]) => [k, $(`#${prefix}_${k}`).value.trim()]));
+  if (!obj.donViQuanLy) obj.donViQuanLy = 'Đội CC và CNCH KV7';
   obj.thangNamHoatDong = formatMmYyyy(obj.thangNamHoatDong);
   const opt = $(`#${prefix}_loaiHinh`)?.selectedOptions?.[0];
   if (opt?.dataset?.lv) obj.linhVuc = opt.dataset.lv; // Đảm bảo luôn lưu ID của phần cha (1..10)
@@ -571,7 +573,10 @@ async function facilities() {
       <h2><i class="fa-solid fa-building-shield"></i> Danh sách cơ sở PCCC (${d.total})</h2>
       <p class="sub-note">${canViewAll ? 'Xem toàn bộ cơ sở của các cán bộ trên địa bàn' : `Danh sách cơ sở thuộc quyền quản lý của cán bộ <b>${esc(ME.hoTen)}</b>`}</p>
     </div>
-    ${canManage ? '<button class="ok" id="add"><i class="fa-solid fa-plus"></i> Thêm cơ sở mới</button>' : ''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="info" id="exportExcel"><i class="fa-solid fa-file-excel"></i> Xuất Excel (${d.total})</button>
+      ${canManage ? '<button class="ok" id="add"><i class="fa-solid fa-plus"></i> Thêm cơ sở mới</button>' : ''}
+    </div>
   </div>
   <form class="bar" id="facFilterForm" autocomplete="off">
     <input id="q" name="q" type="text" autocomplete="off" placeholder="Tìm tên cơ sở, số hồ sơ, mã tài khoản, địa chỉ..." value="${esc(fq.q)}">
@@ -652,6 +657,18 @@ async function facilities() {
   $('#prev').onclick = () => { fq.page--; facilities(); };
   $('#next').onclick = () => { fq.page++; facilities(); };
   if ($('#add')) $('#add').onclick = () => editFacility();
+  $('#exportExcel').onclick = () => {
+    const expParams = new URLSearchParams({
+      q: $('#q').value.trim(),
+      phuong: $('#ph').value,
+      canBo: $('#cb') ? $('#cb').value : '',
+      linhVuc: $('#lv').value,
+      loaiHinh: $('#lh').value,
+      trangThai: $('#tt').value,
+    });
+    if (!canViewAll) expParams.delete('canBo');
+    location.href = '/api/facilities/export?' + expParams.toString();
+  };
   app.querySelectorAll('[data-view]').forEach((b) => (b.onclick = () => viewFacility(d.items.find((x) => x._id === b.dataset.view))));
   app.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => editFacility(d.items.find((x) => x._id === b.dataset.edit))));
   app.querySelectorAll('[data-del]').forEach((b) => (b.onclick = safe(async () => { if (confirm('Xóa cơ sở này?')) { await api('/facilities/' + b.dataset.del, 'DELETE'); facilities(); } })));
@@ -683,7 +700,7 @@ function viewFacility(f) {
     ['Tình trạng vi phạm', f.tinhTrangViPham, true],
     ['Người đại diện / Phụ trách CS', f.nguoiDaiDien],
     ['Số điện thoại', f.dienThoai],
-    ['Đơn vị quản lý', f.donViQuanLy],
+    ['Đơn vị quản lý', f.donViQuanLy || 'Đội CC và CNCH KV7'],
     ['Lần kiểm tra cuối', f.lanKiemTraCuoi ? `${f.lanKiemTraCuoi} (${f.ketQuaKiemTraCuoi || ''})` : '—'],
     ['Ghi chú', f.ghiChu, true],
   ];
